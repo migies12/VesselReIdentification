@@ -30,6 +30,10 @@ Generate splits:
 ```bash
 python -m vessel_reid.cli.split_ids --csv data/all_labels.csv --out-dir data
 ```
+Or generate splits directly from image filenames:
+```bash
+python -m vessel_reid.cli.split_ids --image-dir data/images --out-dir data
+```
 ## Commands
 Train:
 ```bash

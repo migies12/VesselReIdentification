@@ -6,9 +6,9 @@ This template expects a simple CSV-based index with pre-cropped images.
 ```
 data/
   images/
-    boat_0001_day1.jpg
-    boat_0001_day5.jpg
-    boat_0002_day2.jpg
+    123456789_abcd1234.jpg
+    123456789_ef567890.jpg
+    987654321_11223344.jpg
   train.csv
   val.csv
   gallery.csv
@@ -24,9 +24,9 @@ Each CSV should contain the following columns:
 Example:
 ```csv
 image_path,boat_id,length_m
-boat_0001_day1.jpg,1,42.7
-boat_0001_day5.jpg,1,42.7
-boat_0002_day2.jpg,2,18.3
+123456789_abcd1234.jpg,123456789,42.7
+123456789_ef567890.jpg,123456789,42.7
+987654321_11223344.jpg,987654321,18.3
 ```
 
 ## Splits

@@ -1,13 +1,15 @@
 import argparse
 import os
 import random
+from pathlib import Path
 
 import pandas as pd
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create ID-disjoint splits")
-    parser.add_argument("--csv", required=True, help="Master CSV with all labeled images")
+    parser.add_argument("--csv", help="Master CSV with all labeled images")
+    parser.add_argument("--image-dir", help="Directory of images named <boat_id>_<hash>.*")
     parser.add_argument("--out-dir", required=True, help="Output directory for splits")
     parser.add_argument("--train", type=float, default=0.7, help="Train split ratio")
     parser.add_argument("--val", type=float, default=0.1, help="Val split ratio")
@@ -17,12 +19,43 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def build_df_from_images(image_dir: Path) -> pd.DataFrame:
+    image_dir = image_dir.resolve()
+    if not image_dir.exists():
+        raise FileNotFoundError(f"image dir not found: {image_dir}")
+
+    allowed_exts = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+    rows = []
+    for path in sorted(image_dir.iterdir()):
+        if not path.is_file():
+            continue
+        if path.suffix.lower() not in allowed_exts:
+            continue
+        stem = path.stem
+        if "_" not in stem:
+            continue
+        boat_id = stem.split("_", 1)[0]
+        rows.append({"image_path": path.name, "boat_id": boat_id})
+
+    if not rows:
+        raise ValueError(f"no images found in {image_dir} with <boat_id>_<hash>.* naming")
+
+    return pd.DataFrame(rows)
+
+
 def main() -> None:
     args = parse_args()
     if abs(args.train + args.val + args.gallery + args.query - 1.0) > 1e-6:
         raise ValueError("split ratios must sum to 1.0")
 
-    df = pd.read_csv(args.csv)
+    if not args.csv and not args.image_dir:
+        raise ValueError("provide either --csv or --image-dir")
+
+    if args.csv:
+        df = pd.read_csv(args.csv)
+    else:
+        df = build_df_from_images(Path(args.image_dir))
+
     boat_ids = sorted(df["boat_id"].astype(str).unique().tolist())
 
     random.seed(args.seed)
