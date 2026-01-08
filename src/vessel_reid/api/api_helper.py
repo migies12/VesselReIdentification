@@ -11,22 +11,15 @@ def get_access_token(username: str, password: str) -> str:
             "Authorization": f"Bearer {access_token}",
         },
     """
-    query = """
-        query getToken($username: String!, $password: String!) {
-            getToken(username: $username, password: $password) {
-                access_token
-                expires_in
-            }
-        }
-    """
-    variables = {
-        "username": username,
-        "password": password
-    }
+    # Note: Skylight API requires credentials to be embedded directly in the query,
+    # not passed as variables
+
+    print(f"username: {username}, password: {password}")
+    query = f'{{getToken(username: "{username}", password: "{password}") {{access_token expires_in}}}}'
 
     response = requests.post(
         os.getenv("GRAPHQL_URL"),
-        json={"query": query, "variables": variables},
+        json={"query": query},
         headers={"Content-Type": "application/json"},
         timeout=30
     )
@@ -41,9 +34,9 @@ def get_access_token(username: str, password: str) -> str:
 
 def get_recent_correlated_vessels(access_token: str, days: int):
     """
-    Fetch AIS-correlated detections from the Skylight API within a recent time window,
+    Fetch the 30 most recent AIS-correlated detections from the Skylight API,
     including the image and associated metadata
-    
+
     access_token: A valid Skylight API access token obtained via `get_access_token()`
     days: Number of days to look back from the current time (UTC). Only detections with
             timestamps greater than or equal to now - days will be returned
@@ -51,26 +44,54 @@ def get_recent_correlated_vessels(access_token: str, days: int):
     since = datetime.now(timezone.utc) - timedelta(days=days)
 
     query = """
-        query Events($since: DateTime!) {
-            events(
-                filter: {
-                    event_type: { eq: "standard_rendezvous" }
-                    start: { gte: $since }
+        query SearchEventsV2($input: SearchEventsV2Input!) {
+            searchEventsV2(input: $input) {
+                records {
+                    eventId
+                    eventType
+                    start {
+                        time
+                        point { lat lon }
+                    }
+                    end {
+                        time
+                        point { lat lon }
+                    }
+                    vessels {
+                        vessel0 {
+                            mmsi
+                            name
+                            vesselType
+                            countryCode
+                        }
+                    }
+                    eventDetails {
+                        ... on ImageryMetadataEventDetails {
+                            detectionType
+                            score
+                            estimatedLength
+                            frameIds
+                        }
+                    }
                 }
-            ) {
-                event_id
-                event_type
-                start
-                end
-                vessels
-                event_details
-                user_params
+                meta {
+                    total
+                }
             }
         }
     """
 
     variables = {
-        "since": since.isoformat()
+        "input": {
+            "eventType": {"inc": ["sar_sentinel1", "eo_sentinel2", "eo_landsat_8_9", "viirs"]},
+            "startTime": {"gte": since.isoformat()},
+            "eventDetails": {
+                "detectionType": {"eq": "ais_correlated"}
+            },
+            "limit": 30,
+            "sortBy": "created",
+            "sortDirection": "desc"
+        }
     }
 
     response = requests.post(
@@ -89,6 +110,8 @@ def get_recent_correlated_vessels(access_token: str, days: int):
 
     data = response.json()
     if "errors" in data:
+        print(f"DEBUG - HTTP Status Code: {response.status_code}")
+        print(f"DEBUG - API Error Response: {data}")
         raise RuntimeError(data["errors"])
-    
-    return data["data"]["events"]
+
+    return data["data"]["searchEventsV2"]
