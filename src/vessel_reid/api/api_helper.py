@@ -14,7 +14,6 @@ def get_access_token(username: str, password: str) -> str:
     # Note: Skylight API requires credentials to be embedded directly in the query,
     # not passed as variables
 
-    print(f"username: {username}, password: {password}")
     query = f'{{getToken(username: "{username}", password: "{password}") {{access_token expires_in}}}}'
 
     response = requests.post(
@@ -71,6 +70,8 @@ def get_recent_correlated_vessels(access_token: str, days: int):
                             score
                             estimatedLength
                             frameIds
+                            imageUrl
+                            orientation
                         }
                     }
                 }
@@ -83,12 +84,13 @@ def get_recent_correlated_vessels(access_token: str, days: int):
 
     variables = {
         "input": {
-            "eventType": {"inc": ["sar_sentinel1", "eo_sentinel2", "eo_landsat_8_9", "viirs"]},
+            "eventType": {"inc": ["eo_sentinel2"]},
             "startTime": {"gte": since.isoformat()},
             "eventDetails": {
-                "detectionType": {"eq": "ais_correlated"}
+                "detectionType": {"eq": "ais_correlated"},
+                "detectionEstimatedLength": {"gte": 150}
             },
-            "limit": 30,
+            "limit": 100,
             "sortBy": "created",
             "sortDirection": "desc"
         }
