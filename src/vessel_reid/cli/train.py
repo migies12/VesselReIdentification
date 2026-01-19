@@ -4,6 +4,7 @@ from typing import Tuple
 
 import torch
 from torch import nn
+from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -38,6 +39,7 @@ def train_one_epoch(
     criterion: nn.Module,
     device: torch.device,
     log_every: int,
+    scaler: GradScaler,
 ) -> float:
     model.train()
     total_loss = 0.0
@@ -45,13 +47,17 @@ def train_one_epoch(
         (a_img, a_len), (p_img, p_len), (n_img, n_len) = move_batch(batch, device)
         optimizer.zero_grad()
 
-        a_emb = model(a_img, a_len)
-        p_emb = model(p_img, p_len)
-        n_emb = model(n_img, n_len)
+        # Mixed precision forward pass
+        with autocast():
+            a_emb = model(a_img, a_len)
+            p_emb = model(p_img, p_len)
+            n_emb = model(n_img, n_len)
+            loss = criterion(a_emb, p_emb, n_emb)
 
-        loss = criterion(a_emb, p_emb, n_emb)
-        loss.backward()
-        optimizer.step()
+        # Mixed precision backward pass
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         total_loss += loss.item()
         if (step + 1) % log_every == 0:
@@ -81,6 +87,8 @@ def main() -> None:
         batch_size=cfg["data"]["batch_size"],
         shuffle=True,
         num_workers=cfg["data"]["num_workers"],
+        pin_memory=True,
+        persistent_workers=True if cfg["data"]["num_workers"] > 0 else False,
         drop_last=True,
     )
 
@@ -98,6 +106,7 @@ def main() -> None:
         weight_decay=cfg["train"]["weight_decay"],
     )
     criterion = nn.TripletMarginLoss(margin=cfg["train"]["margin"], p=2)
+    scaler = GradScaler()
 
     for epoch in range(cfg["train"]["epochs"]):
         loss = train_one_epoch(
@@ -107,6 +116,7 @@ def main() -> None:
             criterion,
             device,
             cfg["train"]["log_every"],
+            scaler,
         )
         print(f"epoch {epoch + 1}/{cfg['train']['epochs']}: loss {loss:.4f}")
 

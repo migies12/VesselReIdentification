@@ -90,7 +90,7 @@ def get_recent_correlated_vessels(access_token: str, days: int):
                 "detectionType": {"eq": "ais_correlated"},
                 "detectionEstimatedLength": {"gte": 150}
             },
-            "limit": 100,
+            "limit": 1000,
             "sortBy": "created",
             "sortDirection": "desc"
         }
