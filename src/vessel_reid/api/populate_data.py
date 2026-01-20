@@ -37,7 +37,7 @@ def save_event_ids(path: Path, event_ids: set) -> None:
             f.write(f"{event_id}\n")
 
 
-def upsert_row(csv_path: Path, row: dict) -> None:
+def upsert_master_csv_row(csv_path: Path, row: dict) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     rows = {}
 
@@ -66,10 +66,10 @@ if __name__ == "__main__":
 
     all_events = response["records"]
     total = response["meta"]["total"]
+    filtered_event_ids = set()
     
     print(f"\nFetched {len(all_events)} total events across 30 days")
     print(f"Total available events: {total}")
-
 
     # Track images per vessel
     vessel_images = defaultdict(list)
@@ -110,9 +110,10 @@ if __name__ == "__main__":
                 f.write(image_response.content)
 
             saved_count += 1
+            filtered_event_ids.add(event["eventId"])
             print(f"  Saved {output_path.name}")
 
-            upsert_row(
+            upsert_master_csv_row(
                 MASTER_CSV_PATH,
                 {
                     "image_path": output_path.name,
@@ -121,6 +122,8 @@ if __name__ == "__main__":
                 },
             )
 
+
+
     print(f"\n=== Summary ===")
     print(f"Total vessels: {len(vessel_images)}")
     print(f"Vessels filtered (< {MIN_IMAGES_PER_VESSEL} images): {filtered_count}")
@@ -128,6 +131,5 @@ if __name__ == "__main__":
     print(f"Total images saved: {saved_count}")
 
     # Save processed event IDs
-    event_ids = {event['eventId'] for event in all_events}
-    save_event_ids(FETCHED_EVENT_IDS_PATH, event_ids)
-    print(f"\nSaved {len(event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
+    save_event_ids(FETCHED_EVENT_IDS_PATH, filtered_event_ids)
+    print(f"\nSaved {len(filtered_event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
