@@ -31,14 +31,15 @@ def get_access_token(username: str, password: str) -> str:
     token_info = data["data"]["getToken"]
     return token_info["access_token"]
 
-def get_recent_correlated_vessels(access_token: str, days: int):
+def get_recent_correlated_vessels(access_token: str, days: int, offset: int = 0):
     """
-    Fetch the 30 most recent AIS-correlated detections from the Skylight API,
+    Fetch AIS-correlated detections from the Skylight API,
     including the image and associated metadata
 
     access_token: A valid Skylight API access token obtained via `get_access_token()`
     days: Number of days to look back from the current time (UTC). Only detections with
             timestamps greater than or equal to now - days will be returned
+    offset: Pagination offset for fetching results beyond the first page
     """
     since = datetime.now(timezone.utc) - timedelta(days=days)
 
@@ -91,6 +92,7 @@ def get_recent_correlated_vessels(access_token: str, days: int):
                 "detectionEstimatedLength": {"gte": 150}
             },
             "limit": 1000,
+            "offset": offset,
             "sortBy": "created",
             "sortDirection": "desc"
         }

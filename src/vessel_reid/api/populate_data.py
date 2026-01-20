@@ -34,17 +34,40 @@ def upsert_row(csv_path: Path, row: dict) -> None:
 if __name__ == "__main__":
     load_dotenv()
     access_token = api_helper.get_access_token(os.getenv("SKYLIGHT_USERNAME"), os.getenv("SKYLIGHT_PASSWORD"))
-    events = api_helper.get_recent_correlated_vessels(access_token, 30)
+
+    # Fetch all pages of results
+    all_events = []
+    offset = 0
+    limit = 1000
+
+    print("Fetching vessel detections from Skylight API...")
+    while True:
+        print(f"  Fetching events {offset} to {offset + limit}...")
+        response = api_helper.get_recent_correlated_vessels(access_token, 30, offset)
+
+        records = response["records"]
+        total = response["meta"]["total"]
+        all_events.extend(records)
+
+        print(f"  Retrieved {len(records)} events (total available: {total})")
+
+        # Check if we've fetched all results
+        if offset + len(records) >= total:
+            break
+
+        offset += limit
+
+    print(f"\nFetched {len(all_events)} total events across all pages")
 
     # Track images per vessel
     vessel_images = defaultdict(list)
-    for event in events["records"]:
+    for event in all_events:
         mmsi = event['vessels']['vessel0']['mmsi']
         vessel_images[mmsi].append(event)
 
     # Log statistics
     print(f"\nTotal vessels detected: {len(vessel_images)}")
-    print(f"Total events: {len(events['records'])}")
+    print(f"Total events: {len(all_events)}")
     print("\nImages per vessel:")
     for mmsi, events_list in sorted(vessel_images.items(), key=lambda x: len(x[1]), reverse=True):
         print(f"  Vessel {mmsi}: {len(events_list)} images")

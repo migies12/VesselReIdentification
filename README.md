@@ -81,9 +81,15 @@ python -m vessel_reid.cli.infer --config configs/inference.yaml --image path/to/
 - **Change**: Increased API limit from 100 to 1000 events
 - **Why**: Grab way more vessel detections in one API call
 
+- **Change**: Added `offset` parameter for pagination support
+- **Why**: Allow fetching results beyond the first 1000 events
+
 ### `src/vessel_reid/api/populate_data.py`
 - **Change**: Increased time window from 1 day to 30 days
 - **Why**: Need more historical data to find multiple images of each boat
 
 - **Change**: Added vessel grouping and filtering (minimum 3 images per vessel)
 - **Why**: Triplet loss needs multiple images of the same vessel to learn properly
+
+- **Change**: Added pagination loop to fetch all available results
+- **Why**: Don't miss any data if there are more than 1000 events in the time window
