@@ -78,21 +78,18 @@ python -m vessel_reid.cli.infer --config configs/inference.yaml --image path/to/
 - **Why**: Lets cuDNN find the fastest algorithms for this hardware
 
 ### `src/vessel_reid/api/api_helper.py`
-- **Change**: Increased API limit from 100 to 1000 events
-- **Why**: Grab way more vessel detections in one API call
+- **Change**: Added `get_events_from_elasticsearch()` function
+- **Why**: Query Elasticsearch directly instead of GraphQL API for better performance and filtering
 
-- **Change**: Added `offset` parameter for pagination support
-- **Why**: Allow fetching results beyond the first 1000 events
+- **Change**: Elasticsearch query filters to MMSIs with 3+ events upfront
+- **Why**: More efficient than fetching all events and filtering afterward
 
 ### `src/vessel_reid/api/populate_data.py`
-- **Change**: Increased time window from 1 day to 30 days
-- **Why**: Need more historical data to find multiple images of each boat
+- **Change**: Switched from GraphQL API to Elasticsearch for data fetching
+- **Why**: Direct database access is faster and allows better filtering by MMSI count
 
-- **Change**: Added vessel grouping and filtering (minimum 3 images per vessel)
-- **Why**: Triplet loss needs multiple images of the same vessel to learn properly
-
-- **Change**: Added pagination loop to fetch all available results
-- **Why**: Don't miss any data if there are more than 1000 events in the time window
+- **Change**: Removed client-side MIN_IMAGES_PER_VESSEL filtering
+- **Why**: Elasticsearch query already filters to vessels with 3+ events
 
 - **Change**: Save fetched event IDs to `data/fetched_event_ids.txt`
 - **Why**: Track which events were fetched for future reproducibility

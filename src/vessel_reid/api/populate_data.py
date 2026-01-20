@@ -59,31 +59,9 @@ def upsert_row(csv_path: Path, row: dict) -> None:
 
 if __name__ == "__main__":
     load_dotenv()
-    access_token = api_helper.get_access_token(os.getenv("SKYLIGHT_USERNAME"), os.getenv("SKYLIGHT_PASSWORD"))
 
-    # Fetch all pages of results
-    all_events = []
-    offset = 0
-    limit = 1000
-
-    print("Fetching vessel detections from Skylight API...")
-    while True:
-        print(f"  Fetching events {offset} to {offset + limit}...")
-        response = api_helper.get_recent_correlated_vessels(access_token, 30, offset)
-
-        records = response["records"]
-        total = response["meta"]["total"]
-        all_events.extend(records)
-
-        print(f"  Retrieved {len(records)} events (total available: {total})")
-
-        # Check if we've fetched all results
-        if offset + len(records) >= total:
-            break
-
-        offset += limit
-
-    print(f"\nFetched {len(all_events)} total events across all pages")
+    # Fetch events from Elasticsearch (already filtered to MMSIs with 3+ events)
+    all_events = api_helper.get_events_from_elasticsearch(days=30)
 
     # Track images per vessel
     vessel_images = defaultdict(list)
@@ -98,17 +76,10 @@ if __name__ == "__main__":
     for mmsi, events_list in sorted(vessel_images.items(), key=lambda x: len(x[1]), reverse=True):
         print(f"  Vessel {mmsi}: {len(events_list)} images")
 
-    # Download images
-    MIN_IMAGES_PER_VESSEL = 3
+    # Download images (all vessels already have 3+ images from ES query)
     saved_count = 0
-    filtered_count = 0
 
     for mmsi, events_list in vessel_images.items():
-        if len(events_list) < MIN_IMAGES_PER_VESSEL:
-            print(f"\nSkipping vessel {mmsi} (only {len(events_list)} images, need {MIN_IMAGES_PER_VESSEL})")
-            filtered_count += 1
-            continue
-
         print(f"\nProcessing vessel {mmsi} ({len(events_list)} images)")
         for event in events_list:
             image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
@@ -137,8 +108,6 @@ if __name__ == "__main__":
 
     print(f"\n=== Summary ===")
     print(f"Total vessels: {len(vessel_images)}")
-    print(f"Vessels filtered (< {MIN_IMAGES_PER_VESSEL} images): {filtered_count}")
-    print(f"Vessels saved: {len(vessel_images) - filtered_count}")
     print(f"Total images saved: {saved_count}")
 
     # Save processed event IDs
