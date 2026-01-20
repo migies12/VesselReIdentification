@@ -1,13 +1,6 @@
-# Vessel Re-Identification Template
+# Vessel Re-Identification
 
-Template repository for training a vessel ReID model on pre-cropped satellite images and deploying a FAISS gallery for similarity search.
-
-## What this template provides
-- PyTorch ReID model with a ResNet backbone and an embedding head
-- Optional metadata fusion (e.g., vessel length) via a small MLP
-- Triplet-loss training loop (anchor/positive/negative)
-- Scripts to build a FAISS gallery and run inference
-- Clear data layout expectations
+Training a vessel ReID model on pre-cropped satellite images and deploying a FAISS gallery for similarity search.
 
 ## Quick start
 ```bash
@@ -51,7 +44,7 @@ python -m vessel_reid.cli.infer --config configs/inference.yaml --image path/to/
 ```
 
 ## Notes
-- This template assumes each image contains one boat (no detection stage).
+- Assumes each image contains one boat (no detection stage).
 - For evaluation, keep boat IDs disjoint across train/val/test.
 - In deployment, it is expected to keep multiple images per boat in the gallery.
 
