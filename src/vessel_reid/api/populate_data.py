@@ -9,6 +9,32 @@ from uuid import uuid4
 
 IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
 MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
+FETCHED_EVENT_IDS_PATH = IMAGE_DST_PATH.parent / "fetched_event_ids.txt"
+
+
+def load_fetched_event_ids(path: Path) -> set:
+    """Load previously fetched event IDs from file"""
+    if not path.exists():
+        return set()
+
+    with open(path, "r", encoding="utf-8") as f:
+        return set(line.strip() for line in f if line.strip())
+
+
+def save_event_ids(path: Path, event_ids: set) -> None:
+    """Append new event IDs to the file"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Load existing IDs
+    existing_ids = load_fetched_event_ids(path)
+
+    # Combine with new IDs
+    all_ids = existing_ids.union(event_ids)
+
+    # Write all IDs back to file
+    with open(path, "w", encoding="utf-8") as f:
+        for event_id in sorted(all_ids):
+            f.write(f"{event_id}\n")
 
 
 def upsert_row(csv_path: Path, row: dict) -> None:
@@ -114,3 +140,8 @@ if __name__ == "__main__":
     print(f"Vessels filtered (< {MIN_IMAGES_PER_VESSEL} images): {filtered_count}")
     print(f"Vessels saved: {len(vessel_images) - filtered_count}")
     print(f"Total images saved: {saved_count}")
+
+    # Save processed event IDs
+    event_ids = {event['eventId'] for event in all_events}
+    save_event_ids(FETCHED_EVENT_IDS_PATH, event_ids)
+    print(f"\nSaved {len(event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")

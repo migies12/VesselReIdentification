@@ -93,3 +93,6 @@ python -m vessel_reid.cli.infer --config configs/inference.yaml --image path/to/
 
 - **Change**: Added pagination loop to fetch all available results
 - **Why**: Don't miss any data if there are more than 1000 events in the time window
+
+- **Change**: Save fetched event IDs to `data/fetched_event_ids.txt`
+- **Why**: Track which events were fetched for future reproducibility
