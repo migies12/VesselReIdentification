@@ -60,3 +60,20 @@ class ReIDModel(nn.Module):
 
         emb = nn.functional.normalize(emb, p=2, dim=1)
         return emb
+
+    def load_state_dict(self, state_dict, strict: bool = True):
+        if (
+            isinstance(self.embed[0], nn.Dropout)
+            and "embed.0.weight" in state_dict
+            and "embed.2.weight" not in state_dict
+        ):
+            remapped = {}
+            for key, value in state_dict.items():
+                if key.startswith("embed.0."):
+                    remapped[key.replace("embed.0.", "embed.1.", 1)] = value
+                elif key.startswith("embed.1."):
+                    remapped[key.replace("embed.1.", "embed.2.", 1)] = value
+                else:
+                    remapped[key] = value
+            state_dict = remapped
+        return super().load_state_dict(state_dict, strict=strict)
