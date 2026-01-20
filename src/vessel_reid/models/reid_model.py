@@ -13,6 +13,7 @@ class ReIDModel(nn.Module):
         use_length: bool = False,
         length_embed_dim: int = 16,
         pretrained: bool = True,
+        dropout_p: float = 0.2,
     ) -> None:
         super().__init__()
         if backbone == "resnet50":
@@ -26,8 +27,10 @@ class ReIDModel(nn.Module):
 
         self.use_length = use_length
         self.length_embed_dim = length_embed_dim
+        self.dropout_p = dropout_p
 
         self.embed = nn.Sequential(
+            nn.Dropout(p=dropout_p),
             nn.Linear(feature_dim, embedding_dim),
             nn.BatchNorm1d(embedding_dim),
         )
