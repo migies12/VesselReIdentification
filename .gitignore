@@ -12,12 +12,11 @@ build/
 *.pth
 *.npz
 *.npy
-*.csv
 *.json
 runs/
 checkpoints/
 outputs/
 faiss_index/
 .env
-data/
+images/
 

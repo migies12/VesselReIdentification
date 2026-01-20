@@ -31,91 +31,112 @@ def get_access_token(username: str, password: str) -> str:
     token_info = data["data"]["getToken"]
     return token_info["access_token"]
 
-def get_recent_correlated_vessels(access_token: str, days: int, offset: int = 0):
+def get_recent_correlated_vessels(access_token: str, days: int):
     """
     Fetch AIS-correlated detections from the Skylight API,
     including the image and associated metadata
 
-    access_token: A valid Skylight API access token obtained via `get_access_token()`
-    days: Number of days to look back from the current time (UTC). Only detections with
-            timestamps greater than or equal to now - days will be returned
-    offset: Pagination offset for fetching results beyond the first page
-    """
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    Fetches data for each day separately to avoid the 10,000 event API limit,
+    ensuring we can accumulate sufficient data for triplet loss training.
 
-    query = """
-        query SearchEventsV2($input: SearchEventsV2Input!) {
-            searchEventsV2(input: $input) {
-                records {
-                    eventId
-                    eventType
-                    start {
-                        time
-                        point { lat lon }
-                    }
-                    end {
-                        time
-                        point { lat lon }
-                    }
-                    vessels {
-                        vessel0 {
-                            mmsi
-                            name
-                            vesselType
-                            countryCode
+    access_token: A valid Skylight API access token obtained via `get_access_token()`
+    days: Number of days to look back from the current time (UTC).
+    
+    Returns:
+        A dict with 'records' and 'meta' keys, containing accumulated results from all days
+    """
+    all_records = []
+    total_count = 0
+    
+    for delta in range(days):
+        end_time = datetime.now(timezone.utc) - timedelta(days=delta)
+        start_time = end_time - timedelta(days=1)
+
+        query = """
+            query SearchEventsV2($input: SearchEventsV2Input!) {
+                searchEventsV2(input: $input) {
+                    records {
+                        eventId
+                        eventType
+                        start {
+                            time
+                            point { lat lon }
+                        }
+                        end {
+                            time
+                            point { lat lon }
+                        }
+                        vessels {
+                            vessel0 {
+                                mmsi
+                                name
+                                vesselType
+                                countryCode
+                            }
+                        }
+                        eventDetails {
+                            ... on ImageryMetadataEventDetails {
+                                detectionType
+                                score
+                                estimatedLength
+                                frameIds
+                                imageUrl
+                                orientation
+                            }
                         }
                     }
-                    eventDetails {
-                        ... on ImageryMetadataEventDetails {
-                            detectionType
-                            score
-                            estimatedLength
-                            frameIds
-                            imageUrl
-                            orientation
-                        }
+                    meta {
+                        total
                     }
-                }
-                meta {
-                    total
                 }
             }
-        }
-    """
+        """
 
-    variables = {
-        "input": {
-            "eventType": {"inc": ["eo_sentinel2"]},
-            "startTime": {"gte": since.isoformat()},
-            "eventDetails": {
-                "detectionType": {"eq": "ais_correlated"},
-                "detectionEstimatedLength": {"gte": 150}
+        variables = {
+            "input": {
+                "eventType": {"inc": ["eo_sentinel2"]},
+                "startTime": {"gte": start_time.isoformat(), "lt": end_time.isoformat()},
+                "eventDetails": {
+                    "detectionType": {"eq": "ais_correlated"},
+                    "detectionEstimatedLength": {"gte": 150}
+                },
+                "sortBy": "created",
+                "sortDirection": "desc"
+            }
+        }
+
+        response = requests.post(
+            os.getenv("GRAPHQL_URL"),
+            json={
+                "query": query,
+                "variables": variables
             },
-            "limit": 1000,
-            "offset": offset,
-            "sortBy": "created",
-            "sortDirection": "desc"
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+
+        data = response.json()
+        if "errors" in data:
+            print(f"DEBUG - HTTP Status Code: {response.status_code}")
+            print(f"DEBUG - API Error Response: {data}")
+            raise RuntimeError(data["errors"])
+        
+        events = data["data"]["searchEventsV2"]
+        records = events.get("records", [])
+        total = events.get("meta", {}).get("total", 0)
+        
+        all_records.extend(records)
+        total_count += total
+        
+        print(f"Day {delta}: Retrieved {len(records)} events (total for this day: {total})")
+
+    return {
+        "records": all_records,
+        "meta": {
+            "total": total_count
         }
     }
-
-    response = requests.post(
-        os.getenv("GRAPHQL_URL"),
-        json={
-            "query": query,
-            "variables": variables
-        },
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        },
-        timeout=30,
-    )
-    response.raise_for_status()
-
-    data = response.json()
-    if "errors" in data:
-        print(f"DEBUG - HTTP Status Code: {response.status_code}")
-        print(f"DEBUG - API Error Response: {data}")
-        raise RuntimeError(data["errors"])
-
-    return data["data"]["searchEventsV2"]
