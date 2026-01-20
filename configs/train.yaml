@@ -5,8 +5,8 @@ data:
   val_csv: data/val.csv
   image_root: data/images
   image_size: 224
-  num_workers: 4
-  batch_size: 32
+  num_workers: 8
+  batch_size: 128
   use_length: true
   length_mean: 35.0
   length_std: 12.0

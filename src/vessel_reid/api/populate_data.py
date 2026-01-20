@@ -1,5 +1,6 @@
 import api_helper
 from dotenv import load_dotenv
+from collections import defaultdict
 import csv
 import os
 from pathlib import Path
@@ -8,6 +9,32 @@ from uuid import uuid4
 
 IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
 MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
+FETCHED_EVENT_IDS_PATH = IMAGE_DST_PATH.parent / "fetched_event_ids.txt"
+
+
+def load_fetched_event_ids(path: Path) -> set:
+    """Load previously fetched event IDs from file"""
+    if not path.exists():
+        return set()
+
+    with open(path, "r", encoding="utf-8") as f:
+        return set(line.strip() for line in f if line.strip())
+
+
+def save_event_ids(path: Path, event_ids: set) -> None:
+    """Append new event IDs to the file"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Load existing IDs
+    existing_ids = load_fetched_event_ids(path)
+
+    # Combine with new IDs
+    all_ids = existing_ids.union(event_ids)
+
+    # Write all IDs back to file
+    with open(path, "w", encoding="utf-8") as f:
+        for event_id in sorted(all_ids):
+            f.write(f"{event_id}\n")
 
 
 def upsert_row(csv_path: Path, row: dict) -> None:
@@ -33,30 +60,88 @@ def upsert_row(csv_path: Path, row: dict) -> None:
 if __name__ == "__main__":
     load_dotenv()
     access_token = api_helper.get_access_token(os.getenv("SKYLIGHT_USERNAME"), os.getenv("SKYLIGHT_PASSWORD"))
-    events = api_helper.get_recent_correlated_vessels(access_token, 1)
 
-    for event in events["records"]:
+    # Fetch all pages of results
+    all_events = []
+    offset = 0
+    limit = 1000
+
+    print("Fetching vessel detections from Skylight API...")
+    while True:
+        print(f"  Fetching events {offset} to {offset + limit}...")
+        response = api_helper.get_recent_correlated_vessels(access_token, 30, offset)
+
+        records = response["records"]
+        total = response["meta"]["total"]
+        all_events.extend(records)
+
+        print(f"  Retrieved {len(records)} events (total available: {total})")
+
+        # Check if we've fetched all results
+        if offset + len(records) >= total:
+            break
+
+        offset += limit
+
+    print(f"\nFetched {len(all_events)} total events across all pages")
+
+    # Track images per vessel
+    vessel_images = defaultdict(list)
+    for event in all_events:
         mmsi = event['vessels']['vessel0']['mmsi']
-        print(f"Detected event for vessel {mmsi} at {event['start']['time']}")
-        image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
-        image_response.raise_for_status()
+        vessel_images[mmsi].append(event)
 
-        output_path = IMAGE_DST_PATH / f"{mmsi}_{uuid4().hex}.jpg"
-        length_m = event["eventDetails"].get("estimatedLength")
+    # Log statistics
+    print(f"\nTotal vessels detected: {len(vessel_images)}")
+    print(f"Total events: {len(all_events)}")
+    print("\nImages per vessel:")
+    for mmsi, events_list in sorted(vessel_images.items(), key=lambda x: len(x[1]), reverse=True):
+        print(f"  Vessel {mmsi}: {len(events_list)} images")
 
-        if not IMAGE_DST_PATH.exists():
-            IMAGE_DST_PATH.mkdir(parents=True, exist_ok=True)
+    # Download images
+    MIN_IMAGES_PER_VESSEL = 3
+    saved_count = 0
+    filtered_count = 0
 
-        with open(output_path, "wb") as f:
-            f.write(image_response.content)
-            
-        print(f"Saved image to {output_path}")
+    for mmsi, events_list in vessel_images.items():
+        if len(events_list) < MIN_IMAGES_PER_VESSEL:
+            print(f"\nSkipping vessel {mmsi} (only {len(events_list)} images, need {MIN_IMAGES_PER_VESSEL})")
+            filtered_count += 1
+            continue
 
-        upsert_row(
-            MASTER_CSV_PATH,
-            {
-                "image_path": output_path.name,
-                "boat_id": str(mmsi),
-                "length_m": "" if length_m is None else length_m,
-            },
-        )
+        print(f"\nProcessing vessel {mmsi} ({len(events_list)} images)")
+        for event in events_list:
+            image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
+            image_response.raise_for_status()
+
+            output_path = IMAGE_DST_PATH / f"{mmsi}_{uuid4().hex}.jpg"
+            length_m = event["eventDetails"].get("estimatedLength")
+
+            if not IMAGE_DST_PATH.exists():
+                IMAGE_DST_PATH.mkdir(parents=True, exist_ok=True)
+
+            with open(output_path, "wb") as f:
+                f.write(image_response.content)
+
+            saved_count += 1
+            print(f"  Saved {output_path.name}")
+
+            upsert_row(
+                MASTER_CSV_PATH,
+                {
+                    "image_path": output_path.name,
+                    "boat_id": str(mmsi),
+                    "length_m": "" if length_m is None else length_m,
+                },
+            )
+
+    print(f"\n=== Summary ===")
+    print(f"Total vessels: {len(vessel_images)}")
+    print(f"Vessels filtered (< {MIN_IMAGES_PER_VESSEL} images): {filtered_count}")
+    print(f"Vessels saved: {len(vessel_images) - filtered_count}")
+    print(f"Total images saved: {saved_count}")
+
+    # Save processed event IDs
+    event_ids = {event['eventId'] for event in all_events}
+    save_event_ids(FETCHED_EVENT_IDS_PATH, event_ids)
+    print(f"\nSaved {len(event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
