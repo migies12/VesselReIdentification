@@ -17,3 +17,4 @@ query:
   length_std: 12.0
   similarity_threshold: 0.7
   top_k: 5
+  rotate_by_direction: false

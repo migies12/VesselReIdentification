@@ -246,7 +246,8 @@ def get_events_from_elasticsearch(days: int = 30) -> List[Dict[str, Any]]:
                 "event_id",
                 "vessels.vessel_0.mmsi",
                 "event_details.estimated_length",
-                "event_details.image_url"
+                "event_details.image_url",
+                "event_details.heading"
             ]
         }
 
@@ -277,7 +278,8 @@ def get_events_from_elasticsearch(days: int = 30) -> List[Dict[str, Any]]:
                 },
                 "eventDetails": {
                     "imageUrl": source.get("event_details", {}).get("image_url"),
-                    "estimatedLength": source.get("event_details", {}).get("estimated_length")
+                    "estimatedLength": source.get("event_details", {}).get("estimated_length"),
+                    "heading": source.get("event_details", {}).get("heading")
                 }
             })
 
@@ -308,7 +310,8 @@ def get_events_from_elasticsearch(days: int = 30) -> List[Dict[str, Any]]:
                     },
                     "eventDetails": {
                         "imageUrl": source.get("event_details", {}).get("image_url"),
-                        "estimatedLength": source.get("event_details", {}).get("estimated_length")
+                        "estimatedLength": source.get("event_details", {}).get("estimated_length"),
+                        "heading": source.get("event_details", {}).get("heading")
                     }
                 })
 

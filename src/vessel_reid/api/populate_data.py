@@ -51,7 +51,7 @@ def upsert_row(csv_path: Path, row: dict) -> None:
     rows[row["image_path"]] = row
 
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
-        fieldnames = ["image_path", "boat_id", "length_m"]
+        fieldnames = ["image_path", "boat_id", "length_m", "heading"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for key in sorted(rows.keys()):
@@ -87,6 +87,7 @@ if __name__ == "__main__":
 
             output_path = IMAGE_DST_PATH / f"{mmsi}_{uuid4().hex}.jpg"
             length_m = event["eventDetails"].get("estimatedLength")
+            heading = event["eventDetails"].get("heading")
 
             if not IMAGE_DST_PATH.exists():
                 IMAGE_DST_PATH.mkdir(parents=True, exist_ok=True)
@@ -103,6 +104,7 @@ if __name__ == "__main__":
                     "image_path": output_path.name,
                     "boat_id": str(mmsi),
                     "length_m": "" if length_m is None else length_m,
+                    "heading": "" if heading is None else heading,
                 },
             )
 

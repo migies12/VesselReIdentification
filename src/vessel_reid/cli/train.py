@@ -80,6 +80,7 @@ def main() -> None:
         use_length=cfg["data"]["use_length"],
         length_mean=cfg["data"]["length_mean"],
         length_std=cfg["data"]["length_std"],
+        rotate_by_direction=cfg["data"].get("rotate_by_direction", False),
     )
     dataset = TripletDataset(data_cfg)
     loader = DataLoader(

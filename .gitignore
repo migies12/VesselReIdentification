@@ -20,4 +20,4 @@ outputs/
 faiss_index/
 .env
 data/
-
+tmpclaude-*

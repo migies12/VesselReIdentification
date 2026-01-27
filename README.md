@@ -50,6 +50,24 @@ Query:
 python -m vessel_reid.cli.infer --config configs/inference.yaml --image path/to/query.jpg --length-m 42.7
 ```
 
+If using `rotate_by_direction: true`, also provide the heading:
+```bash
+python -m vessel_reid.cli.infer --config configs/inference.yaml --image path/to/query.jpg --length-m 42.7 --heading 45.0
+```
+
+## Configuration Options
+
+### `rotate_by_direction` (default: `false`)
+When enabled, images are rotated by their vessel heading to normalize all vessels to face north (0 degrees), then center-cropped to `side / sqrt(2)` (approximately 70% of original size) to ensure valid content for any rotation angle.
+
+This can improve accuracy by making the model invariant to vessel orientation. To enable:
+1. Set `rotate_by_direction: true` in `configs/train.yaml` (under `data:`)
+2. Set `rotate_by_direction: true` in `configs/gallery.yaml` (under `gallery:`)
+3. Set `rotate_by_direction: true` in `configs/inference.yaml` (under `query:`)
+4. Ensure your CSV contains a `heading` column with vessel heading values (0-360 degrees)
+
+The heading data is automatically fetched from Elasticsearch when using `populate_data.py`.
+
 ## Notes
 - This template assumes each image contains one boat (no detection stage).
 - For evaluation, keep boat IDs disjoint across train/val/test.
@@ -93,3 +111,6 @@ python -m vessel_reid.cli.infer --config configs/inference.yaml --image path/to/
 
 - **Change**: Save fetched event IDs to `data/fetched_event_ids.txt`
 - **Why**: Track which events were fetched for future reproducibility
+
+- **Change**: Added `rotate_by_direction` option to rotate images by vessel heading and crop to consistent size
+- **Why**: Normalizes vessel orientation to potentially improve model accuracy

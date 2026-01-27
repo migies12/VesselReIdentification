@@ -31,6 +31,7 @@ def main() -> None:
         use_length=cfg["gallery"]["use_length"],
         length_mean=cfg["gallery"]["length_mean"],
         length_std=cfg["gallery"]["length_std"],
+        rotate_by_direction=cfg["gallery"].get("rotate_by_direction", False),
     )
     dataset = SingleImageDataset(data_cfg)
     loader = DataLoader(dataset, batch_size=64, shuffle=False, num_workers=4)

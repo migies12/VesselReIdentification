@@ -1,6 +1,7 @@
 from collections import defaultdict
+import math
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -18,6 +19,41 @@ class DataConfig:
     use_length: bool
     length_mean: float
     length_std: float
+    rotate_by_direction: bool = False
+
+
+def rotate_and_crop_by_heading(image: Image.Image, heading: float) -> Image.Image:
+    """
+    Rotate image to normalize vessel heading and crop to the largest inscribed square.
+
+    Args:
+        image: PIL Image to transform
+        heading: Vessel heading in degrees (0-360, where 0 is north)
+
+    Returns:
+        Rotated and cropped PIL Image
+    """
+    # Rotate image by negative heading to normalize all vessels to face north (0 degrees)
+    # expand=True keeps the full rotated image without clipping corners
+    rotated = image.rotate(-heading, resample=Image.BILINEAR, expand=True)
+
+    # Calculate the crop size: side / sqrt(2) ensures valid crop for any rotation
+    # Use the original image dimensions for the calculation
+    original_size = min(image.width, image.height)
+    crop_size = int(original_size / math.sqrt(2))
+
+    # Center crop the rotated image
+    center_x = rotated.width // 2
+    center_y = rotated.height // 2
+    half_crop = crop_size // 2
+
+    left = center_x - half_crop
+    top = center_y - half_crop
+    right = left + crop_size
+    bottom = top + crop_size
+
+    cropped = rotated.crop((left, top, right, bottom))
+    return cropped
 
 
 def build_transforms(image_size: int) -> transforms.Compose:
@@ -47,6 +83,11 @@ class TripletDataset(Dataset):
         row = self.df.iloc[idx]
         image_path = f"{self.cfg.image_root}/{row['image_path']}"
         image = Image.open(image_path).convert("RGB")
+
+        if self.cfg.rotate_by_direction and pd.notna(row.get("heading")):
+            heading = float(row["heading"])
+            image = rotate_and_crop_by_heading(image, heading)
+
         image = self.transform(image)
         length_tensor = torch.zeros(1, dtype=torch.float32)
         if self.cfg.use_length:
@@ -88,6 +129,11 @@ class SingleImageDataset(Dataset):
         row = self.df.iloc[idx]
         image_path = f"{self.cfg.image_root}/{row['image_path']}"
         image = Image.open(image_path).convert("RGB")
+
+        if self.cfg.rotate_by_direction and pd.notna(row.get("heading")):
+            heading = float(row["heading"])
+            image = rotate_and_crop_by_heading(image, heading)
+
         image = self.transform(image)
         length_tensor = torch.zeros(1, dtype=torch.float32)
         length_value = None

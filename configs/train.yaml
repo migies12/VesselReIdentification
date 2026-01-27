@@ -10,6 +10,7 @@ data:
   use_length: true
   length_mean: 35.0
   length_std: 12.0
+  rotate_by_direction: false
 
 model:
   backbone: resnet50
