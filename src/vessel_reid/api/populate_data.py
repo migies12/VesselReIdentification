@@ -86,9 +86,14 @@ if __name__ == "__main__":
     saved_count = 0
     all_downloads = [(mmsi, event) for mmsi, events_list in vessel_images.items() for event in events_list]
 
+    skylight_base_url = os.getenv("GRAPHQL_URL", "").replace("/graphql", "")
+
     for mmsi, event in tqdm(all_downloads, desc="Downloading images"):
+        image_url = event['eventDetails']['imageUrl']
+        if not image_url.startswith("http"):
+            image_url = f"{skylight_base_url}/{image_url}"
         image_response = requests.get(
-            event['eventDetails']['imageUrl'],
+            image_url,
             headers={"Authorization": f"Bearer {access_token}"},
             timeout=30,
         )
