@@ -133,6 +133,8 @@ def get_recent_correlated_vessels(
     if "errors" in data:
         print(f"DEBUG - HTTP Status Code: {response.status_code}")
         print(f"DEBUG - API Error Response: {data}")
+        if data.get("data", {}).get("searchEventsV2") is None:
+            return {"records": [], "meta": {"total": 0}}
         raise RuntimeError(data["errors"])
 
     return data["data"]["searchEventsV2"]
@@ -232,6 +234,8 @@ def get_recent_correlated_events_for_vessel(
     if "errors" in data:
         print(f"DEBUG - HTTP Status Code: {response.status_code}")
         print(f"DEBUG - API Error Response: {data}")
+        if data.get("data", {}).get("searchEventsV2") is None:
+            return {"records": [], "meta": {"total": 0}}
         raise RuntimeError(data["errors"])
 
     return data["data"]["searchEventsV2"]

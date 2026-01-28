@@ -125,15 +125,19 @@ if __name__ == "__main__":
         fetched = []
         offset = 0
         while len(fetched) + len(vessel_images[mmsi]) < target_count:
-            response = api_helper.get_recent_correlated_events_for_vessel(
-                access_token,
-                mmsi,
-                BACKFILL_LOOKBACK_DAYS,
-                offset=offset,
-                limit=limit,
-                event_types=BACKFILL_EVENT_TYPES,
-                min_estimated_length=BACKFILL_MIN_ESTIMATED_LENGTH,
-            )
+            try:
+                response = api_helper.get_recent_correlated_events_for_vessel(
+                    access_token,
+                    mmsi,
+                    BACKFILL_LOOKBACK_DAYS,
+                    offset=offset,
+                    limit=limit,
+                    event_types=BACKFILL_EVENT_TYPES,
+                    min_estimated_length=BACKFILL_MIN_ESTIMATED_LENGTH,
+                )
+            except RuntimeError as exc:
+                print(f"  Backfill failed for vessel {mmsi}: {exc}")
+                break
 
             records = response["records"]
             total = response["meta"]["total"]
