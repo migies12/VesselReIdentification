@@ -1,6 +1,8 @@
 import argparse
+import csv
+import json
 import os
-from typing import Tuple
+from typing import Dict, Tuple
 
 import torch
 from torch import nn
@@ -8,7 +10,7 @@ from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from vessel_reid.data.dataset import DataConfig, TripletDataset
+from vessel_reid.data.dataset import DataConfig, LabeledImageDataset, PKBatchSampler
 from vessel_reid.models.reid_model import ReIDModel
 from vessel_reid.utils.config import load_config
 from vessel_reid.utils.seed import seed_everything
@@ -21,38 +23,80 @@ def parse_args() -> argparse.Namespace:
 
 
 def move_batch(batch: Tuple, device: torch.device):
-    (a_img, a_len), (p_img, p_len), (n_img, n_len) = batch
-    a_img = a_img.to(device)
-    p_img = p_img.to(device)
-    n_img = n_img.to(device)
-    if a_len is not None:
-        a_len = a_len.to(device)
-        p_len = p_len.to(device)
-        n_len = n_len.to(device)
-    return (a_img, a_len), (p_img, p_len), (n_img, n_len)
+    images, lengths, labels = batch
+    images = images.to(device)
+    lengths = lengths.to(device) if lengths is not None else None
+    labels = torch.tensor(labels, device=device)
+    return images, lengths, labels
+
+
+class BatchHardTripletLoss(nn.Module):
+    def __init__(self, margin: float = 0.3) -> None:
+        super().__init__()
+        self.margin = margin
+
+    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
+        n = embeddings.size(0)
+        if n <= 1:
+            return embeddings.sum() * 0.0, {"pos_dist": 0.0, "neg_dist": 0.0, "valid_frac": 0.0}
+
+        dot = torch.matmul(embeddings, embeddings.t())
+        sq = torch.diag(dot)
+        dist = sq.unsqueeze(1) - 2 * dot + sq.unsqueeze(0)
+        dist = torch.clamp(dist, min=0.0)
+        dist = torch.sqrt(dist + 1e-12)
+
+        labels = labels.view(-1, 1)
+        mask_pos = labels.eq(labels.t())
+        mask_pos.fill_diagonal_(False)
+        mask_neg = labels.ne(labels.t())
+
+        pos_dist = dist.clone()
+        pos_dist[~mask_pos] = -1e9
+        hardest_pos, _ = pos_dist.max(dim=1)
+
+        neg_dist = dist.clone()
+        neg_dist[~mask_neg] = 1e9
+        hardest_neg, _ = neg_dist.min(dim=1)
+
+        valid = (mask_pos.sum(dim=1) > 0) & (mask_neg.sum(dim=1) > 0)
+        if valid.any():
+            losses = torch.relu(hardest_pos - hardest_neg + self.margin)
+            loss = losses[valid].mean()
+            pos_mean = hardest_pos[valid].mean().item()
+            neg_mean = hardest_neg[valid].mean().item()
+            valid_frac = valid.float().mean().item()
+        else:
+            loss = embeddings.sum() * 0.0
+            pos_mean = 0.0
+            neg_mean = 0.0
+            valid_frac = 0.0
+
+        return loss, {"pos_dist": pos_mean, "neg_dist": neg_mean, "valid_frac": valid_frac}
 
 
 def train_one_epoch(
     model: nn.Module,
     loader: DataLoader,
     optimizer: torch.optim.Optimizer,
-    criterion: nn.Module,
+    criterion: BatchHardTripletLoss,
     device: torch.device,
     log_every: int,
     scaler: GradScaler,
-) -> float:
+) -> Tuple[float, float, float, float]:
     model.train()
     total_loss = 0.0
+    total_pos = 0.0
+    total_neg = 0.0
+    total_valid = 0.0
     for step, batch in enumerate(tqdm(loader, desc="train", leave=False)):
-        (a_img, a_len), (p_img, p_len), (n_img, n_len) = move_batch(batch, device)
+        images, lengths, labels = move_batch(batch, device)
         optimizer.zero_grad()
 
         # Mixed precision forward pass
         with autocast():
-            a_emb = model(a_img, a_len)
-            p_emb = model(p_img, p_len)
-            n_emb = model(n_img, n_len)
-            loss = criterion(a_emb, p_emb, n_emb)
+            embeddings = model(images, lengths)
+            loss, stats = criterion(embeddings, labels)
 
         # Mixed precision backward pass
         scaler.scale(loss).backward()
@@ -60,10 +104,88 @@ def train_one_epoch(
         scaler.update()
 
         total_loss += loss.item()
+        total_pos += stats["pos_dist"]
+        total_neg += stats["neg_dist"]
+        total_valid += stats["valid_frac"]
         if (step + 1) % log_every == 0:
             avg = total_loss / (step + 1)
-            tqdm.write(f"step {step + 1}: loss {avg:.4f}")
-    return total_loss / max(len(loader), 1)
+            pos = total_pos / (step + 1)
+            neg = total_neg / (step + 1)
+            valid = total_valid / (step + 1)
+            tqdm.write(f"step {step + 1}: loss {avg:.4f} pos {pos:.3f} neg {neg:.3f} valid {valid:.2f}")
+    denom = max(len(loader), 1)
+    return total_loss / denom, total_pos / denom, total_neg / denom, total_valid / denom
+
+
+def append_stats(path: str, row: Dict[str, float]) -> None:
+    exists = os.path.exists(path)
+    with open(path, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=row.keys())
+        if not exists:
+            writer.writeheader()
+        writer.writerow(row)
+
+
+def save_stats_json(path: str, stats: Dict) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(stats, f, indent=2)
+
+
+def maybe_plot_loss(csv_path: str, out_path: str) -> None:
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return
+
+    epochs = []
+    losses = []
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            epochs.append(int(row["epoch"]))
+            losses.append(float(row["train_loss"]))
+
+    if not epochs:
+        return
+
+    plt.figure(figsize=(6, 4))
+    plt.plot(epochs, losses, marker="o")
+    plt.xlabel("epoch")
+    plt.ylabel("train_loss")
+    plt.title("training loss")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()
+
+
+def compute_length_stats(csv_path: str) -> Tuple[float, float, int]:
+    count = 0
+    mean = 0.0
+    m2 = 0.0
+    with open(csv_path, "r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames is None or "length_m" not in reader.fieldnames:
+            raise ValueError("length_m column not found in training CSV")
+        for row in reader:
+            val = row.get("length_m")
+            if val is None or val == "":
+                continue
+            try:
+                x = float(val)
+            except ValueError:
+                continue
+            count += 1
+            delta = x - mean
+            mean += delta / count
+            m2 += delta * (x - mean)
+
+    if count == 0:
+        raise ValueError("no valid length_m values found in training CSV")
+
+    var_pop = m2 / count
+    std = var_pop**0.5
+    return mean, std, count
 
 
 def main() -> None:
@@ -73,24 +195,53 @@ def main() -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    length_mean = cfg["data"].get("length_mean")
+    length_std = cfg["data"].get("length_std")
+    if cfg["data"]["use_length"] and cfg["data"].get("compute_length_stats", False):
+        length_mean, length_std, count = compute_length_stats(cfg["data"]["train_csv"])
+        print(f"computed length stats from train.csv: mean={length_mean:.4f} std={length_std:.4f} count={count}")
+
     data_cfg = DataConfig(
         csv_path=cfg["data"]["train_csv"],
         image_root=cfg["data"]["image_root"],
         image_size=cfg["data"]["image_size"],
         use_length=cfg["data"]["use_length"],
-        length_mean=cfg["data"]["length_mean"],
-        length_std=cfg["data"]["length_std"],
+        length_mean=float(length_mean),
+        length_std=float(length_std),
+        rotate_by_direction=cfg["data"].get("rotate_by_direction", False),
+        augment=cfg["data"].get("augment", True),
     )
-    dataset = TripletDataset(data_cfg)
-    loader = DataLoader(
-        dataset,
-        batch_size=cfg["data"]["batch_size"],
-        shuffle=True,
-        num_workers=cfg["data"]["num_workers"],
-        pin_memory=True,
-        persistent_workers=True if cfg["data"]["num_workers"] > 0 else False,
-        drop_last=True,
-    )
+    dataset = LabeledImageDataset(data_cfg)
+
+    pk_cfg = cfg["data"].get("pk_sampler", {})
+    use_pk = pk_cfg.get("enabled", True)
+    if use_pk:
+        p = pk_cfg.get("p", 16)
+        k = pk_cfg.get("k", 4)
+        batch_sampler = PKBatchSampler(
+            dataset.indices_by_id,
+            p=p,
+            k=k,
+            batches_per_epoch=pk_cfg.get("batches_per_epoch"),
+            seed=cfg["seed"],
+        )
+        loader = DataLoader(
+            dataset,
+            batch_sampler=batch_sampler,
+            num_workers=cfg["data"]["num_workers"],
+            pin_memory=True,
+            persistent_workers=True if cfg["data"]["num_workers"] > 0 else False,
+        )
+    else:
+        loader = DataLoader(
+            dataset,
+            batch_size=cfg["data"]["batch_size"],
+            shuffle=True,
+            num_workers=cfg["data"]["num_workers"],
+            pin_memory=True,
+            persistent_workers=True if cfg["data"]["num_workers"] > 0 else False,
+            drop_last=True,
+        )
 
     model = ReIDModel(
         backbone=cfg["model"]["backbone"],
@@ -105,10 +256,18 @@ def main() -> None:
         lr=cfg["train"]["lr"],
         weight_decay=cfg["train"]["weight_decay"],
     )
-    criterion = nn.TripletMarginLoss(margin=cfg["train"]["margin"], p=2)
+    criterion = BatchHardTripletLoss(margin=cfg["train"]["margin"])
     scaler = GradScaler()
 
+    os.makedirs(cfg["train"]["output_dir"], exist_ok=True)
+    stats_csv = os.path.join(cfg["train"]["output_dir"], "train_stats.csv")
+    stats_json = os.path.join(cfg["train"]["output_dir"], "train_stats.json")
+    stats_plot = os.path.join(cfg["train"]["output_dir"], "loss_curve.png")
+    history = []
+
     for epoch in range(cfg["train"]["epochs"]):
+        if use_pk:
+            loader.batch_sampler.set_epoch(epoch)
         loss = train_one_epoch(
             model,
             loader,
@@ -118,9 +277,24 @@ def main() -> None:
             cfg["train"]["log_every"],
             scaler,
         )
-        print(f"epoch {epoch + 1}/{cfg['train']['epochs']}: loss {loss:.4f}")
+        train_loss, pos_dist, neg_dist, valid_frac = loss
+        print(
+            f"epoch {epoch + 1}/{cfg['train']['epochs']}: "
+            f"loss {train_loss:.4f} pos {pos_dist:.3f} neg {neg_dist:.3f} valid {valid_frac:.2f}"
+        )
 
-    os.makedirs(cfg["train"]["output_dir"], exist_ok=True)
+        row = {
+            "epoch": epoch + 1,
+            "train_loss": train_loss,
+            "train_pos_dist": pos_dist,
+            "train_neg_dist": neg_dist,
+            "train_valid_frac": valid_frac,
+        }
+        history.append(row)
+        append_stats(stats_csv, row)
+        save_stats_json(stats_json, history)
+        maybe_plot_loss(stats_csv, stats_plot)
+
     checkpoint_path = os.path.join(cfg["train"]["output_dir"], cfg["train"]["checkpoint_name"])
     torch.save(model.state_dict(), checkpoint_path)
     print(f"saved model to {checkpoint_path}")
