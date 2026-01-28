@@ -159,6 +159,35 @@ def maybe_plot_loss(csv_path: str, out_path: str) -> None:
     plt.close()
 
 
+def compute_length_stats(csv_path: str) -> Tuple[float, float, int]:
+    count = 0
+    mean = 0.0
+    m2 = 0.0
+    with open(csv_path, "r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames is None or "length_m" not in reader.fieldnames:
+            raise ValueError("length_m column not found in training CSV")
+        for row in reader:
+            val = row.get("length_m")
+            if val is None or val == "":
+                continue
+            try:
+                x = float(val)
+            except ValueError:
+                continue
+            count += 1
+            delta = x - mean
+            mean += delta / count
+            m2 += delta * (x - mean)
+
+    if count == 0:
+        raise ValueError("no valid length_m values found in training CSV")
+
+    var_pop = m2 / count
+    std = var_pop**0.5
+    return mean, std, count
+
+
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
@@ -166,13 +195,19 @@ def main() -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    length_mean = cfg["data"].get("length_mean")
+    length_std = cfg["data"].get("length_std")
+    if cfg["data"]["use_length"] and cfg["data"].get("compute_length_stats", False):
+        length_mean, length_std, count = compute_length_stats(cfg["data"]["train_csv"])
+        print(f"computed length stats from train.csv: mean={length_mean:.4f} std={length_std:.4f} count={count}")
+
     data_cfg = DataConfig(
         csv_path=cfg["data"]["train_csv"],
         image_root=cfg["data"]["image_root"],
         image_size=cfg["data"]["image_size"],
         use_length=cfg["data"]["use_length"],
-        length_mean=cfg["data"]["length_mean"],
-        length_std=cfg["data"]["length_std"],
+        length_mean=float(length_mean),
+        length_std=float(length_std),
         rotate_by_direction=cfg["data"].get("rotate_by_direction", False),
         augment=cfg["data"].get("augment", True),
     )

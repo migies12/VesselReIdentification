@@ -8,8 +8,9 @@ data:
   num_workers: 8
   batch_size: 128
   use_length: true
-  length_mean: 35.0
-  length_std: 12.0
+  compute_length_stats: true
+  length_mean: 221.2029
+  length_std: 44.8894
   rotate_by_direction: false
   augment: true
   pk_sampler:
