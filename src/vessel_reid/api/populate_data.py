@@ -66,50 +66,51 @@ if __name__ == "__main__":
 
     load_dotenv()
 
-    # Authenticate with Skylight API for image downloads
-    skylight_username = os.getenv("SKYLIGHT_USERNAME")
-    skylight_password = os.getenv("SKYLIGHT_PASSWORD")
-    if not skylight_username or not skylight_password:
-        raise ValueError("SKYLIGHT_USERNAME and SKYLIGHT_PASSWORD must be set for image downloads")
-    access_token = api_helper.get_access_token(skylight_username, skylight_password)
-
     # Fetch events from Elasticsearch (already filtered to MMSIs with 3+ events)
     all_events = api_helper.get_events_from_elasticsearch(days=args.days)
 
+    # Skip already-fetched events
+    fetched_ids = load_fetched_event_ids(FETCHED_EVENT_IDS_PATH)
+    new_events = [e for e in all_events if e['eventId'] not in fetched_ids]
+    print(f"Skipping {len(all_events) - len(new_events)} already-fetched events")
+
     # Track images per vessel
     vessel_images = defaultdict(list)
-    for event in all_events:
+    for event in new_events:
         mmsi = event['vessels']['vessel0']['mmsi']
         vessel_images[mmsi].append(event)
 
     # Download images (all vessels already have 3+ images from ES query)
     saved_count = 0
+    failed_count = 0
+    succeeded_event_ids = set()
     all_downloads = [(mmsi, event) for mmsi, events_list in vessel_images.items() for event in events_list]
 
     skylight_base_url = os.getenv("IMAGE_BASE_URL", "https://cdn.sky-prod-a.skylight.earth")
+
+    IMAGE_DST_PATH.mkdir(parents=True, exist_ok=True)
 
     for mmsi, event in tqdm(all_downloads, desc="Downloading images"):
         image_url = event['eventDetails']['imageUrl']
         if not image_url.startswith("http"):
             image_url = f"{skylight_base_url}/{image_url}"
-        image_response = requests.get(
-            image_url,
-            headers={"Authorization": f"Bearer {access_token}"},
-            timeout=30,
-        )
-        image_response.raise_for_status()
+        try:
+            image_response = requests.get(image_url, timeout=30)
+            image_response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            failed_count += 1
+            tqdm.write(f"  Failed to download {image_url}: {e}")
+            continue
 
         output_path = IMAGE_DST_PATH / f"{mmsi}_{uuid4().hex}.jpg"
         length_m = event["eventDetails"].get("estimatedLength")
         heading = event["eventDetails"].get("heading")
 
-        if not IMAGE_DST_PATH.exists():
-            IMAGE_DST_PATH.mkdir(parents=True, exist_ok=True)
-
         with open(output_path, "wb") as f:
             f.write(image_response.content)
 
         saved_count += 1
+        succeeded_event_ids.add(event['eventId'])
 
         upsert_row(
             MASTER_CSV_PATH,
@@ -124,8 +125,8 @@ if __name__ == "__main__":
     print(f"\n=== Summary ===")
     print(f"Total vessels: {len(vessel_images)}")
     print(f"Total images saved: {saved_count}")
+    print(f"Failed downloads: {failed_count}")
 
-    # Save processed event IDs
-    event_ids = {event['eventId'] for event in all_events}
-    save_event_ids(FETCHED_EVENT_IDS_PATH, event_ids)
-    print(f"Saved {len(event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
+    # Save only successfully downloaded event IDs
+    save_event_ids(FETCHED_EVENT_IDS_PATH, succeeded_event_ids)
+    print(f"Saved {len(succeeded_event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
