@@ -1,3 +1,4 @@
+import argparse
 import api_helper
 from dotenv import load_dotenv
 from collections import defaultdict
@@ -58,10 +59,14 @@ def upsert_row(csv_path: Path, row: dict) -> None:
             writer.writerow(rows[key])
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Fetch vessel images from Elasticsearch")
+    parser.add_argument("--days", type=int, default=30, help="Number of days to look back (default: 30)")
+    args = parser.parse_args()
+
     load_dotenv()
 
     # Fetch events from Elasticsearch (already filtered to MMSIs with 3+ events)
-    all_events = api_helper.get_events_from_elasticsearch(days=30)
+    all_events = api_helper.get_events_from_elasticsearch(days=args.days)
 
     # Track images per vessel
     vessel_images = defaultdict(list)
@@ -69,18 +74,10 @@ if __name__ == "__main__":
         mmsi = event['vessels']['vessel0']['mmsi']
         vessel_images[mmsi].append(event)
 
-    # Log statistics
-    print(f"\nTotal vessels detected: {len(vessel_images)}")
-    print(f"Total events: {len(all_events)}")
-    print("\nImages per vessel:")
-    for mmsi, events_list in sorted(vessel_images.items(), key=lambda x: len(x[1]), reverse=True):
-        print(f"  Vessel {mmsi}: {len(events_list)} images")
-
     # Download images (all vessels already have 3+ images from ES query)
     saved_count = 0
 
     for mmsi, events_list in vessel_images.items():
-        print(f"\nProcessing vessel {mmsi} ({len(events_list)} images)")
         for event in events_list:
             image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
             image_response.raise_for_status()
@@ -96,7 +93,6 @@ if __name__ == "__main__":
                 f.write(image_response.content)
 
             saved_count += 1
-            print(f"  Saved {output_path.name}")
 
             upsert_row(
                 MASTER_CSV_PATH,
@@ -115,4 +111,4 @@ if __name__ == "__main__":
     # Save processed event IDs
     event_ids = {event['eventId'] for event in all_events}
     save_event_ids(FETCHED_EVENT_IDS_PATH, event_ids)
-    print(f"\nSaved {len(event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
+    print(f"Saved {len(event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
