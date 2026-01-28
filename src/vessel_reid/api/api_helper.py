@@ -69,7 +69,6 @@ def get_recent_correlated_vessels(
                         vessel0 {
                             mmsi
                             name
-                            vesselType
                             countryCode
                         }
                     }
@@ -168,7 +167,6 @@ def get_recent_correlated_events_for_vessel(
                         vessel0 {
                             mmsi
                             name
-                            vesselType
                             countryCode
                         }
                     }
