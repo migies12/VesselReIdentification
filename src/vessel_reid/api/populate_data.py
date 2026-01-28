@@ -66,6 +66,13 @@ if __name__ == "__main__":
 
     load_dotenv()
 
+    # Authenticate with Skylight API for image downloads
+    skylight_username = os.getenv("SKYLIGHT_USERNAME")
+    skylight_password = os.getenv("SKYLIGHT_PASSWORD")
+    if not skylight_username or not skylight_password:
+        raise ValueError("SKYLIGHT_USERNAME and SKYLIGHT_PASSWORD must be set for image downloads")
+    access_token = api_helper.get_access_token(skylight_username, skylight_password)
+
     # Fetch events from Elasticsearch (already filtered to MMSIs with 3+ events)
     all_events = api_helper.get_events_from_elasticsearch(days=args.days)
 
@@ -80,7 +87,11 @@ if __name__ == "__main__":
     all_downloads = [(mmsi, event) for mmsi, events_list in vessel_images.items() for event in events_list]
 
     for mmsi, event in tqdm(all_downloads, desc="Downloading images"):
-        image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
+        image_response = requests.get(
+            event['eventDetails']['imageUrl'],
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
         image_response.raise_for_status()
 
         output_path = IMAGE_DST_PATH / f"{mmsi}_{uuid4().hex}.jpg"
