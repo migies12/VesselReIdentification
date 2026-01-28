@@ -6,7 +6,7 @@ import csv
 import os
 from pathlib import Path
 import requests
-from uuid import uuid4
+import re
 from tqdm import tqdm
 
 IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
@@ -102,7 +102,9 @@ if __name__ == "__main__":
             tqdm.write(f"  Failed to download {image_url}: {e}")
             continue
 
-        output_path = IMAGE_DST_PATH / f"{mmsi}_{uuid4().hex}.jpg"
+        # Use event ID in filename to prevent duplicates
+        safe_event_id = re.sub(r'[^\w\-]', '_', event['eventId'])
+        output_path = IMAGE_DST_PATH / f"{mmsi}_{safe_event_id}.png"
         length_m = event["eventDetails"].get("estimatedLength")
         heading = event["eventDetails"].get("heading")
 
@@ -122,11 +124,15 @@ if __name__ == "__main__":
             },
         )
 
+        # Save event IDs every 1000 successful downloads
+        if saved_count % 1000 == 0:
+            save_event_ids(FETCHED_EVENT_IDS_PATH, succeeded_event_ids)
+
     print(f"\n=== Summary ===")
     print(f"Total vessels: {len(vessel_images)}")
     print(f"Total images saved: {saved_count}")
     print(f"Failed downloads: {failed_count}")
 
-    # Save only successfully downloaded event IDs
+    # Final save of event IDs
     save_event_ids(FETCHED_EVENT_IDS_PATH, succeeded_event_ids)
     print(f"Saved {len(succeeded_event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
