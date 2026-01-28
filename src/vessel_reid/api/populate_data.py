@@ -94,7 +94,6 @@ if __name__ == "__main__":
             image_url = f"{skylight_base_url}/{image_url}"
         image_response = requests.get(
             image_url,
-            headers={"Authorization": f"Bearer {access_token}"},
             timeout=30,
         )
         image_response.raise_for_status()
