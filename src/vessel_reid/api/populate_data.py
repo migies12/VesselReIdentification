@@ -86,7 +86,7 @@ if __name__ == "__main__":
     saved_count = 0
     all_downloads = [(mmsi, event) for mmsi, events_list in vessel_images.items() for event in events_list]
 
-    skylight_base_url = os.getenv("IMAGE_BASE_URL", "https://cdn.sky-int-a.skylight.earth")
+    skylight_base_url = os.getenv("IMAGE_BASE_URL", "https://cdn.sky-prod-a.skylight.earth")
 
     for mmsi, event in tqdm(all_downloads, desc="Downloading images"):
         image_url = event['eventDetails']['imageUrl']
