@@ -11,6 +11,12 @@ data:
   length_mean: 35.0
   length_std: 12.0
   rotate_by_direction: false
+  augment: true
+  pk_sampler:
+    enabled: true
+    p: 16
+    k: 4
+    batches_per_epoch: null
 
 model:
   backbone: resnet50

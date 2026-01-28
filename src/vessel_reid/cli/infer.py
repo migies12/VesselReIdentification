@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-from vessel_reid.data.dataset import build_transforms, rotate_and_crop_by_heading
+from vessel_reid.data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
 from vessel_reid.models.reid_model import ReIDModel
 from vessel_reid.utils.config import load_config
 from vessel_reid.utils.faiss_index import load_index, load_metadata, search
@@ -39,14 +39,14 @@ def main() -> None:
     index = load_index(cfg["faiss"]["index_path"])
     metadata = load_metadata(cfg["faiss"]["metadata_path"])
 
-    transform = build_transforms(cfg["query"]["image_size"])
+    transform = build_eval_transforms(cfg["query"]["image_size"])
     image = Image.open(args.image).convert("RGB")
 
     rotate_by_direction = cfg["query"].get("rotate_by_direction", False)
     if rotate_by_direction and args.heading is not None:
         image = rotate_and_crop_by_heading(image, args.heading)
 
-    image = transform(image).unsqueeze(0).to(device)
+    image = apply_transforms(image, transform).unsqueeze(0).to(device)
 
     length_tensor = None
     if cfg["query"]["use_length"]:
