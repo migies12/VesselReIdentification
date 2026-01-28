@@ -10,6 +10,10 @@ from uuid import uuid4
 IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
 MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
 FETCHED_EVENT_IDS_PATH = IMAGE_DST_PATH.parent / "fetched_event_ids.txt"
+MIN_IMAGES_PER_VESSEL = 3
+BACKFILL_LOOKBACK_DAYS = 540
+BACKFILL_EVENT_TYPES = ["eo_sentinel2", "eo_landsat_8_9", "sar_sentinel1"]
+BACKFILL_MIN_ESTIMATED_LENGTH = 150
 
 
 def load_fetched_event_ids(path: Path) -> set:
@@ -60,6 +64,7 @@ def upsert_row(csv_path: Path, row: dict) -> None:
 if __name__ == "__main__":
     load_dotenv()
     access_token = api_helper.get_access_token(os.getenv("SKYLIGHT_USERNAME"), os.getenv("SKYLIGHT_PASSWORD"))
+    fetched_event_ids = load_fetched_event_ids(FETCHED_EVENT_IDS_PATH)
 
     # Fetch all pages of results
     all_events = []
@@ -69,7 +74,14 @@ if __name__ == "__main__":
     print("Fetching vessel detections from Skylight API...")
     while True:
         print(f"  Fetching events {offset} to {offset + limit}...")
-        response = api_helper.get_recent_correlated_vessels(access_token, 30, offset)
+        response = api_helper.get_recent_correlated_vessels(
+            access_token,
+            30,
+            offset,
+            limit=limit,
+            event_types=BACKFILL_EVENT_TYPES,
+            min_estimated_length=BACKFILL_MIN_ESTIMATED_LENGTH,
+        )
 
         records = response["records"]
         total = response["meta"]["total"]
@@ -87,7 +99,13 @@ if __name__ == "__main__":
 
     # Track images per vessel
     vessel_images = defaultdict(list)
+    seen_event_ids = set()
     for event in all_events:
+        if event["eventId"] in seen_event_ids:
+            continue
+        seen_event_ids.add(event["eventId"])
+        if not event.get("eventDetails") or not event["eventDetails"].get("imageUrl"):
+            continue
         mmsi = event['vessels']['vessel0']['mmsi']
         vessel_images[mmsi].append(event)
 
@@ -99,11 +117,54 @@ if __name__ == "__main__":
         print(f"  Vessel {mmsi}: {len(events_list)} images")
 
     # Download images
-    MIN_IMAGES_PER_VESSEL = 3
     saved_count = 0
     filtered_count = 0
+    downloaded_event_ids = set()
+
+    def backfill_vessel_events(mmsi: int, target_count: int, existing_event_ids: set) -> list:
+        fetched = []
+        offset = 0
+        while len(fetched) + len(vessel_images[mmsi]) < target_count:
+            response = api_helper.get_recent_correlated_events_for_vessel(
+                access_token,
+                mmsi,
+                BACKFILL_LOOKBACK_DAYS,
+                offset=offset,
+                limit=limit,
+                event_types=BACKFILL_EVENT_TYPES,
+                min_estimated_length=BACKFILL_MIN_ESTIMATED_LENGTH,
+            )
+
+            records = response["records"]
+            total = response["meta"]["total"]
+            if not records:
+                break
+
+            for event in records:
+                if event["eventId"] in existing_event_ids:
+                    continue
+                if not event.get("eventDetails") or not event["eventDetails"].get("imageUrl"):
+                    continue
+                existing_event_ids.add(event["eventId"])
+                fetched.append(event)
+                if len(fetched) + len(vessel_images[mmsi]) >= target_count:
+                    break
+
+            if offset + len(records) >= total:
+                break
+            offset += limit
+
+        return fetched
 
     for mmsi, events_list in vessel_images.items():
+        if len(events_list) < MIN_IMAGES_PER_VESSEL:
+            print(f"\nVessel {mmsi} has only {len(events_list)} images; backfilling...")
+            backfilled = backfill_vessel_events(mmsi, MIN_IMAGES_PER_VESSEL, seen_event_ids)
+            if backfilled:
+                vessel_images[mmsi].extend(backfilled)
+                events_list = vessel_images[mmsi]
+                print(f"  Added {len(backfilled)} images from backfill (total now {len(events_list)})")
+
         if len(events_list) < MIN_IMAGES_PER_VESSEL:
             print(f"\nSkipping vessel {mmsi} (only {len(events_list)} images, need {MIN_IMAGES_PER_VESSEL})")
             filtered_count += 1
@@ -111,6 +172,9 @@ if __name__ == "__main__":
 
         print(f"\nProcessing vessel {mmsi} ({len(events_list)} images)")
         for event in events_list:
+            if event["eventId"] in fetched_event_ids:
+                continue
+
             image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
             image_response.raise_for_status()
 
@@ -124,6 +188,7 @@ if __name__ == "__main__":
                 f.write(image_response.content)
 
             saved_count += 1
+            downloaded_event_ids.add(event["eventId"])
             print(f"  Saved {output_path.name}")
 
             upsert_row(
@@ -142,6 +207,5 @@ if __name__ == "__main__":
     print(f"Total images saved: {saved_count}")
 
     # Save processed event IDs
-    event_ids = {event['eventId'] for event in all_events}
-    save_event_ids(FETCHED_EVENT_IDS_PATH, event_ids)
-    print(f"\nSaved {len(event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
+    save_event_ids(FETCHED_EVENT_IDS_PATH, downloaded_event_ids)
+    print(f"\nSaved {len(downloaded_event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
