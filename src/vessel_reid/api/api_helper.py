@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta, timezone
+import math
 import os
 import requests
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
+from tqdm import tqdm
 
 load_dotenv()
 
@@ -218,14 +220,14 @@ def get_events_from_elasticsearch(days: int = 30) -> List[Dict[str, Any]]:
         return []
 
     # Now fetch all events for those MMSIs
-    print("Fetching event details...")
     all_events = []
 
     # Query in batches of MMSIs to avoid URL length issues
     mmsi_list = list(mmsis_with_multiple_events)
     batch_size = 100
+    num_batches = math.ceil(len(mmsi_list) / batch_size)
 
-    for i in range(0, len(mmsi_list), batch_size):
+    for i in tqdm(range(0, len(mmsi_list), batch_size), total=num_batches, desc="Fetching events"):
         mmsi_batch = mmsi_list[i:i+batch_size]
 
         # Use scroll API for large result sets
@@ -315,7 +317,6 @@ def get_events_from_elasticsearch(days: int = 30) -> List[Dict[str, Any]]:
                     }
                 })
 
-        print(f"Processed MMSI batch {i//batch_size + 1}/{(len(mmsi_list)-1)//batch_size + 1}")
 
     print(f"Fetched {len(all_events)} total events from Elasticsearch")
     return all_events

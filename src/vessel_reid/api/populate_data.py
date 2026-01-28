@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import requests
 from uuid import uuid4
+from tqdm import tqdm
 
 IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
 MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
@@ -76,33 +77,33 @@ if __name__ == "__main__":
 
     # Download images (all vessels already have 3+ images from ES query)
     saved_count = 0
+    all_downloads = [(mmsi, event) for mmsi, events_list in vessel_images.items() for event in events_list]
 
-    for mmsi, events_list in vessel_images.items():
-        for event in events_list:
-            image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
-            image_response.raise_for_status()
+    for mmsi, event in tqdm(all_downloads, desc="Downloading images"):
+        image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
+        image_response.raise_for_status()
 
-            output_path = IMAGE_DST_PATH / f"{mmsi}_{uuid4().hex}.jpg"
-            length_m = event["eventDetails"].get("estimatedLength")
-            heading = event["eventDetails"].get("heading")
+        output_path = IMAGE_DST_PATH / f"{mmsi}_{uuid4().hex}.jpg"
+        length_m = event["eventDetails"].get("estimatedLength")
+        heading = event["eventDetails"].get("heading")
 
-            if not IMAGE_DST_PATH.exists():
-                IMAGE_DST_PATH.mkdir(parents=True, exist_ok=True)
+        if not IMAGE_DST_PATH.exists():
+            IMAGE_DST_PATH.mkdir(parents=True, exist_ok=True)
 
-            with open(output_path, "wb") as f:
-                f.write(image_response.content)
+        with open(output_path, "wb") as f:
+            f.write(image_response.content)
 
-            saved_count += 1
+        saved_count += 1
 
-            upsert_row(
-                MASTER_CSV_PATH,
-                {
-                    "image_path": output_path.name,
-                    "boat_id": str(mmsi),
-                    "length_m": "" if length_m is None else length_m,
-                    "heading": "" if heading is None else heading,
-                },
-            )
+        upsert_row(
+            MASTER_CSV_PATH,
+            {
+                "image_path": output_path.name,
+                "boat_id": str(mmsi),
+                "length_m": "" if length_m is None else length_m,
+                "heading": "" if heading is None else heading,
+            },
+        )
 
     print(f"\n=== Summary ===")
     print(f"Total vessels: {len(vessel_images)}")
