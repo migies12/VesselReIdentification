@@ -63,7 +63,13 @@ def rotate_and_crop_by_heading(image: Image.Image, heading: float) -> Image.Imag
 def build_train_transforms(image_size: int) -> A.Compose:
     return A.Compose(
         [
-            A.Resize(image_size, image_size),
+            A.RandomResizedCrop(
+                height=image_size,
+                width=image_size,
+                scale=(0.85, 1.0),
+                ratio=(0.9, 1.1),
+                p=1.0,
+            ),
             A.ShiftScaleRotate(
                 shift_limit=0.05,
                 scale_limit=0.1,
@@ -71,6 +77,7 @@ def build_train_transforms(image_size: int) -> A.Compose:
                 border_mode=cv2.BORDER_REFLECT_101,
                 p=0.6,
             ),
+            A.GaussianBlur(blur_limit=(3, 5), p=0.2),
             A.RandomBrightnessContrast(p=0.5),
             A.HueSaturationValue(p=0.3),
             A.GaussNoise(var_limit=(5.0, 25.0), p=0.3),

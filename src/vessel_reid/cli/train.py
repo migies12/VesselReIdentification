@@ -2,13 +2,14 @@ import argparse
 import csv
 import json
 import os
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import torch
 from torch import nn
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import torch.nn.functional as F
 
 from vessel_reid.data.dataset import DataConfig, LabeledImageDataset, PKBatchSampler
 from vessel_reid.models.reid_model import ReIDModel
@@ -75,20 +76,48 @@ class BatchHardTripletLoss(nn.Module):
         return loss, {"pos_dist": pos_mean, "neg_dist": neg_mean, "valid_frac": valid_frac}
 
 
+class ArcFaceHead(nn.Module):
+    def __init__(self, embedding_dim: int, num_classes: int, scale: float = 30.0, margin: float = 0.5) -> None:
+        super().__init__()
+        self.scale = scale
+        self.margin = margin
+        self.weight = nn.Parameter(torch.randn(num_classes, embedding_dim))
+        nn.init.xavier_uniform_(self.weight)
+
+    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        # embeddings are expected to be L2-normalized
+        cosine = F.linear(embeddings, F.normalize(self.weight))
+        cosine = cosine.clamp(-1.0 + 1e-7, 1.0 - 1e-7)
+        theta = torch.acos(cosine)
+        target_logit = torch.cos(theta + self.margin)
+
+        one_hot = torch.zeros_like(cosine)
+        one_hot.scatter_(1, labels.view(-1, 1), 1.0)
+        output = cosine * (1.0 - one_hot) + target_logit * one_hot
+        return output * self.scale
+
+
 def train_one_epoch(
     model: nn.Module,
     loader: DataLoader,
     optimizer: torch.optim.Optimizer,
     criterion: BatchHardTripletLoss,
+    arcface_head: Optional[ArcFaceHead],
+    arcface_weight: float,
+    use_arcface: bool,
+    use_triplet: bool,
     device: torch.device,
     log_every: int,
     scaler: GradScaler,
-) -> Tuple[float, float, float, float]:
+) -> Tuple[float, float, float, float, float]:
     model.train()
+    if use_arcface and arcface_head is None:
+        raise ValueError("arcface_head must be provided when use_arcface=true")
     total_loss = 0.0
     total_pos = 0.0
     total_neg = 0.0
     total_valid = 0.0
+    total_arcface = 0.0
     for step, batch in enumerate(tqdm(loader, desc="train", leave=False)):
         images, lengths, labels = move_batch(batch, device)
         optimizer.zero_grad()
@@ -96,7 +125,22 @@ def train_one_epoch(
         # Mixed precision forward pass
         with autocast():
             embeddings = model(images, lengths)
-            loss, stats = criterion(embeddings, labels)
+            triplet_loss = torch.tensor(0.0, device=device)
+            stats = {"pos_dist": 0.0, "neg_dist": 0.0, "valid_frac": 0.0}
+            if use_triplet:
+                triplet_loss, stats = criterion(embeddings, labels)
+
+            arcface_loss = torch.tensor(0.0, device=device)
+            if use_arcface:
+                logits = arcface_head(embeddings, labels)
+                arcface_loss = F.cross_entropy(logits, labels)
+
+            if use_triplet and use_arcface:
+                loss = triplet_loss + arcface_weight * arcface_loss
+            elif use_arcface:
+                loss = arcface_loss
+            else:
+                loss = triplet_loss
 
         # Mixed precision backward pass
         scaler.scale(loss).backward()
@@ -107,14 +151,22 @@ def train_one_epoch(
         total_pos += stats["pos_dist"]
         total_neg += stats["neg_dist"]
         total_valid += stats["valid_frac"]
+        total_arcface += arcface_loss.item() if use_arcface else 0.0
         if (step + 1) % log_every == 0:
             avg = total_loss / (step + 1)
             pos = total_pos / (step + 1)
             neg = total_neg / (step + 1)
             valid = total_valid / (step + 1)
-            tqdm.write(f"step {step + 1}: loss {avg:.4f} pos {pos:.3f} neg {neg:.3f} valid {valid:.2f}")
+            if use_arcface:
+                arc = total_arcface / (step + 1)
+                tqdm.write(
+                    f"step {step + 1}: loss {avg:.4f} arc {arc:.4f} pos {pos:.3f} neg {neg:.3f} valid {valid:.2f}"
+                )
+            else:
+                tqdm.write(f"step {step + 1}: loss {avg:.4f} pos {pos:.3f} neg {neg:.3f} valid {valid:.2f}")
     denom = max(len(loader), 1)
-    return total_loss / denom, total_pos / denom, total_neg / denom, total_valid / denom
+    arcface_avg = total_arcface / denom if use_arcface else 0.0
+    return total_loss / denom, total_pos / denom, total_neg / denom, total_valid / denom, arcface_avg
 
 
 def append_stats(path: str, row: Dict[str, float]) -> None:
@@ -251,12 +303,28 @@ def main() -> None:
         pretrained=cfg["model"]["pretrained"],
     ).to(device)
 
+    params = list(model.parameters())
+    if use_arcface:
+        params += list(arcface_head.parameters())
     optimizer = torch.optim.AdamW(
-        model.parameters(),
+        params,
         lr=cfg["train"]["lr"],
         weight_decay=cfg["train"]["weight_decay"],
     )
+    loss_mode = cfg["train"].get("loss", "triplet")
+    use_triplet = loss_mode in ("triplet", "combined")
+    use_arcface = loss_mode in ("arcface", "combined")
+    arcface_weight = float(cfg["train"].get("arcface_weight", 1.0))
+
     criterion = BatchHardTripletLoss(margin=cfg["train"]["margin"])
+    arcface_head = None
+    if use_arcface:
+        arcface_head = ArcFaceHead(
+            embedding_dim=cfg["model"]["embedding_dim"],
+            num_classes=len(dataset.id_to_index),
+            scale=float(cfg["train"].get("arcface_scale", 30.0)),
+            margin=float(cfg["train"].get("arcface_margin", 0.5)),
+        ).to(device)
     scaler = GradScaler()
 
     os.makedirs(cfg["train"]["output_dir"], exist_ok=True)
@@ -273,19 +341,24 @@ def main() -> None:
             loader,
             optimizer,
             criterion,
+            arcface_head,
+            arcface_weight,
+            use_arcface,
+            use_triplet,
             device,
             cfg["train"]["log_every"],
             scaler,
         )
-        train_loss, pos_dist, neg_dist, valid_frac = loss
+        train_loss, pos_dist, neg_dist, valid_frac, arcface_loss = loss
         print(
             f"epoch {epoch + 1}/{cfg['train']['epochs']}: "
-            f"loss {train_loss:.4f} pos {pos_dist:.3f} neg {neg_dist:.3f} valid {valid_frac:.2f}"
+            f"loss {train_loss:.4f} arc {arcface_loss:.4f} pos {pos_dist:.3f} neg {neg_dist:.3f} valid {valid_frac:.2f}"
         )
 
         row = {
             "epoch": epoch + 1,
             "train_loss": train_loss,
+            "train_arcface_loss": arcface_loss,
             "train_pos_dist": pos_dist,
             "train_neg_dist": neg_dist,
             "train_valid_frac": valid_frac,

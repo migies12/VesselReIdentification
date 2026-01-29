@@ -47,7 +47,7 @@ python -m vessel_reid.cli.infer --config configs/inference.yaml --image path/to/
 - Assumes each image contains one boat (no detection stage).
 - For evaluation, keep boat IDs disjoint across train/val/test.
 - In deployment, it is expected to keep multiple images per boat in the gallery.
-
+538006648_bd6fdad1039641bca89994c2689f6bc5.jpg
 ---
 
 ## Changelog - Branch: `mica`
