@@ -27,7 +27,11 @@ def move_batch(batch: Tuple, device: torch.device):
     images, lengths, labels = batch
     images = images.to(device)
     lengths = lengths.to(device) if lengths is not None else None
-    labels = torch.tensor(labels, device=device)
+    if torch.is_tensor(labels):
+        labels = labels.to(device)
+    else:
+        labels = torch.tensor(labels, device=device)
+    labels = labels.long()
     return images, lengths, labels
 
 
@@ -123,7 +127,7 @@ def train_one_epoch(
         optimizer.zero_grad()
 
         # Mixed precision forward pass
-        with autocast():
+        with autocast(device_type=device.type, enabled=use_amp):
             embeddings = model(images, lengths)
             triplet_loss = torch.tensor(0.0, device=device)
             stats = {"pos_dist": 0.0, "neg_dist": 0.0, "valid_frac": 0.0}
@@ -326,7 +330,8 @@ def main() -> None:
         lr=cfg["train"]["lr"],
         weight_decay=cfg["train"]["weight_decay"],
     )
-    scaler = GradScaler()
+    use_amp = device.type == "cuda"
+    scaler = GradScaler(enabled=use_amp)
 
     os.makedirs(cfg["train"]["output_dir"], exist_ok=True)
     stats_csv = os.path.join(cfg["train"]["output_dir"], "train_stats.csv")
