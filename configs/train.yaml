@@ -34,7 +34,7 @@ train:
   loss: combined
   triplet_weight: 1.0
   triplet:
-    distance: cosine
+    distance: euclidean
     margin: 0.2
     softplus: true
   arcface_margin: 0.5

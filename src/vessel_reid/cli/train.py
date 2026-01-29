@@ -47,10 +47,11 @@ class BatchHardTripletLoss(nn.Module):
         if n <= 1:
             return embeddings.sum() * 0.0, {"pos_dist": 0.0, "neg_dist": 0.0, "valid_frac": 0.0}
 
-        if self.distance == "cosine":
+        distance = self.distance.lower()
+        if distance == "cosine":
             sim = torch.matmul(embeddings, embeddings.t())
             dist = 1.0 - sim
-        elif self.distance == "euclidean":
+        elif distance in ("euclidean", "euclidian"):
             dot = torch.matmul(embeddings, embeddings.t())
             sq = torch.diag(dot)
             dist = sq.unsqueeze(1) - 2 * dot + sq.unsqueeze(0)

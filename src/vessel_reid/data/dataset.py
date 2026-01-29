@@ -69,6 +69,7 @@ def build_train_transforms(image_size: int) -> A.Compose:
                 ratio=(0.9, 1.1),
                 p=1.0,
             ),
+            A.Rotate(limit=180, border_mode=cv2.BORDER_REFLECT_101, p=0.5),
             A.ShiftScaleRotate(
                 shift_limit=0.05,
                 scale_limit=0.1,
