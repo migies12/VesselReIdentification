@@ -37,17 +37,18 @@ Build gallery:
 ```bash
 python -m vessel_reid.cli.build_gallery --config configs/gallery.yaml
 ```
+python -m vessel_reid.cli.build_gallery --config configs/gallery.yaml
 
 Query:
 ```bash
 python -m vessel_reid.cli.infer --config configs/inference.yaml --image path/to/query.jpg --length-m 42.7
 ```
-
+210872000_16ab5454bffc4531bccff00e60a54e62.jpg,210872000,229
 ## Notes
 - Assumes each image contains one boat (no detection stage).
 - For evaluation, keep boat IDs disjoint across train/val/test.
 - In deployment, it is expected to keep multiple images per boat in the gallery.
-538006648_bd6fdad1039641bca89994c2689f6bc5.jpg
+
 ---
 
 ## Changelog - Branch: `mica`

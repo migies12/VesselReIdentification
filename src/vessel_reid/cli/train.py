@@ -36,20 +36,28 @@ def move_batch(batch: Tuple, device: torch.device):
 
 
 class BatchHardTripletLoss(nn.Module):
-    def __init__(self, margin: float = 0.3) -> None:
+    def __init__(self, margin: float = 0.3, distance: str = "cosine", softplus: bool = True) -> None:
         super().__init__()
         self.margin = margin
+        self.distance = distance
+        self.softplus = softplus
 
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
         n = embeddings.size(0)
         if n <= 1:
             return embeddings.sum() * 0.0, {"pos_dist": 0.0, "neg_dist": 0.0, "valid_frac": 0.0}
 
-        dot = torch.matmul(embeddings, embeddings.t())
-        sq = torch.diag(dot)
-        dist = sq.unsqueeze(1) - 2 * dot + sq.unsqueeze(0)
-        dist = torch.clamp(dist, min=0.0)
-        dist = torch.sqrt(dist + 1e-12)
+        if self.distance == "cosine":
+            sim = torch.matmul(embeddings, embeddings.t())
+            dist = 1.0 - sim
+        elif self.distance == "euclidean":
+            dot = torch.matmul(embeddings, embeddings.t())
+            sq = torch.diag(dot)
+            dist = sq.unsqueeze(1) - 2 * dot + sq.unsqueeze(0)
+            dist = torch.clamp(dist, min=0.0)
+            dist = torch.sqrt(dist + 1e-12)
+        else:
+            raise ValueError(f"unsupported distance: {self.distance}")
 
         labels = labels.view(-1, 1)
         mask_pos = labels.eq(labels.t())
@@ -66,7 +74,8 @@ class BatchHardTripletLoss(nn.Module):
 
         valid = (mask_pos.sum(dim=1) > 0) & (mask_neg.sum(dim=1) > 0)
         if valid.any():
-            losses = torch.relu(hardest_pos - hardest_neg + self.margin)
+            raw = hardest_pos - hardest_neg + self.margin
+            losses = torch.nn.functional.softplus(raw) if self.softplus else torch.relu(raw)
             loss = losses[valid].mean()
             pos_mean = hardest_pos[valid].mean().item()
             neg_mean = hardest_neg[valid].mean().item()
@@ -108,6 +117,7 @@ def train_one_epoch(
     criterion: BatchHardTripletLoss,
     arcface_head: Optional[ArcFaceHead],
     arcface_weight: float,
+    triplet_weight: float,
     use_arcface: bool,
     use_triplet: bool,
     device: torch.device,
@@ -141,11 +151,11 @@ def train_one_epoch(
                 arcface_loss = F.cross_entropy(logits, labels)
 
             if use_triplet and use_arcface:
-                loss = triplet_loss + arcface_weight * arcface_loss
+                loss = triplet_weight * triplet_loss + arcface_weight * arcface_loss
             elif use_arcface:
                 loss = arcface_loss
             else:
-                loss = triplet_loss
+                loss = triplet_weight * triplet_loss
 
         # Mixed precision backward pass
         scaler.scale(loss).backward()
@@ -312,8 +322,14 @@ def main() -> None:
     use_triplet = loss_mode in ("triplet", "combined")
     use_arcface = loss_mode in ("arcface", "combined")
     arcface_weight = float(cfg["train"].get("arcface_weight", 1.0))
+    triplet_weight = float(cfg["train"].get("triplet_weight", 1.0))
 
-    criterion = BatchHardTripletLoss(margin=cfg["train"]["margin"])
+    triplet_cfg = cfg["train"].get("triplet", {})
+    criterion = BatchHardTripletLoss(
+        margin=float(triplet_cfg.get("margin", cfg["train"]["margin"])),
+        distance=str(triplet_cfg.get("distance", "cosine")),
+        softplus=bool(triplet_cfg.get("softplus", True)),
+    )
     arcface_head = None
     if use_arcface:
         arcface_head = ArcFaceHead(
@@ -350,6 +366,7 @@ def main() -> None:
             criterion,
             arcface_head,
             arcface_weight,
+            triplet_weight,
             use_arcface,
             use_triplet,
             device,
