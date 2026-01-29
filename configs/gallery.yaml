@@ -15,5 +15,5 @@ gallery:
   image_root: data/images
   image_size: 224
   use_length: true
-  length_mean: 35.0
-  length_std: 12.0
+  length_mean: 221.2029
+  length_std: 44.8894
