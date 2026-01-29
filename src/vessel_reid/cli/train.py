@@ -306,11 +306,6 @@ def main() -> None:
     params = list(model.parameters())
     if use_arcface:
         params += list(arcface_head.parameters())
-    optimizer = torch.optim.AdamW(
-        params,
-        lr=cfg["train"]["lr"],
-        weight_decay=cfg["train"]["weight_decay"],
-    )
     loss_mode = cfg["train"].get("loss", "triplet")
     use_triplet = loss_mode in ("triplet", "combined")
     use_arcface = loss_mode in ("arcface", "combined")
@@ -325,6 +320,15 @@ def main() -> None:
             scale=float(cfg["train"].get("arcface_scale", 30.0)),
             margin=float(cfg["train"].get("arcface_margin", 0.5)),
         ).to(device)
+
+    params = list(model.parameters())
+    if use_arcface:
+        params += list(arcface_head.parameters())
+    optimizer = torch.optim.AdamW(
+        params,
+        lr=cfg["train"]["lr"],
+        weight_decay=cfg["train"]["weight_decay"],
+    )
     scaler = GradScaler()
 
     os.makedirs(cfg["train"]["output_dir"], exist_ok=True)

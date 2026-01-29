@@ -79,9 +79,9 @@ def build_train_transforms(image_size: int) -> A.Compose:
             A.GaussianBlur(blur_limit=(3, 5), p=0.2),
             A.RandomBrightnessContrast(p=0.5),
             A.HueSaturationValue(p=0.3),
-            A.GaussNoise(var_limit=(5.0, 25.0), p=0.3),
-            A.ImageCompression(quality_lower=30, quality_upper=80, p=0.3),
-            A.Downscale(scale_min=0.5, scale_max=0.9, p=0.3),
+            A.GaussNoise(p=0.3),
+            A.ImageCompression(p=0.3),
+            A.Downscale(p=0.3),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2(),
         ]
