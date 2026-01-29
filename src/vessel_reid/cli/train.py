@@ -111,6 +111,7 @@ def train_one_epoch(
     use_arcface: bool,
     use_triplet: bool,
     device: torch.device,
+    use_amp: bool,
     log_every: int,
     scaler: GradScaler,
 ) -> Tuple[float, float, float, float, float]:
@@ -352,6 +353,7 @@ def main() -> None:
             use_arcface,
             use_triplet,
             device,
+            use_amp,
             cfg["train"]["log_every"],
             scaler,
         )
