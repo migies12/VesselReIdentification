@@ -64,8 +64,7 @@ def build_train_transforms(image_size: int) -> A.Compose:
     return A.Compose(
         [
             A.RandomResizedCrop(
-                height=image_size,
-                width=image_size,
+                size=(image_size, image_size),
                 scale=(0.85, 1.0),
                 ratio=(0.9, 1.1),
                 p=1.0,
