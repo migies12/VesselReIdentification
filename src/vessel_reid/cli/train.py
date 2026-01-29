@@ -128,7 +128,7 @@ def train_one_epoch(
         optimizer.zero_grad()
 
         # Mixed precision forward pass
-        with autocast(device_type=device.type, enabled=use_amp):
+        with autocast(enabled=use_amp):
             embeddings = model(images, lengths)
             triplet_loss = torch.tensor(0.0, device=device)
             stats = {"pos_dist": 0.0, "neg_dist": 0.0, "valid_frac": 0.0}
