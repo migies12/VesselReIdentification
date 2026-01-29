@@ -303,9 +303,6 @@ def main() -> None:
         pretrained=cfg["model"]["pretrained"],
     ).to(device)
 
-    params = list(model.parameters())
-    if use_arcface:
-        params += list(arcface_head.parameters())
     loss_mode = cfg["train"].get("loss", "triplet")
     use_triplet = loss_mode in ("triplet", "combined")
     use_arcface = loss_mode in ("arcface", "combined")
