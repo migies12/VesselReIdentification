@@ -1,0 +1,4 @@
+# Shared settings used across training, gallery building, and inference
+# Change rotate_by_direction here to affect all tasks
+
+rotate_by_direction: false

@@ -6,7 +6,7 @@ from PIL import Image
 
 from vessel_reid.data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
 from vessel_reid.models.reid_model import ReIDModel
-from vessel_reid.utils.config import load_config
+from vessel_reid.utils.config import load_config, load_shared_config
 from vessel_reid.utils.faiss_index import load_index, load_metadata, search
 
 
@@ -22,6 +22,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
+    shared_cfg = load_shared_config()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -42,7 +43,7 @@ def main() -> None:
     transform = build_eval_transforms(cfg["query"]["image_size"])
     image = Image.open(args.image).convert("RGB")
 
-    rotate_by_direction = cfg["query"].get("rotate_by_direction", False)
+    rotate_by_direction = shared_cfg.get("rotate_by_direction", cfg["query"].get("rotate_by_direction", False))
     if rotate_by_direction and args.heading is not None:
         image = rotate_and_crop_by_heading(image, args.heading)
 
