@@ -1,9 +1,9 @@
 model:
   checkpoint: outputs/reid_model.pt
   backbone: resnet50
-  embedding_dim: 256
+  embedding_dim: 512
   use_length: true
-  length_embed_dim: 16
+  length_embed_dim: 32
 
 faiss:
   index_path: faiss_index/gallery.index
@@ -15,5 +15,5 @@ gallery:
   image_root: data/images
   image_size: 224
   use_length: true
-  length_mean: 35.0
-  length_std: 12.0
+  length_mean: 221.2029
+  length_std: 44.8894

@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-from vessel_reid.data.dataset import build_transforms
+from vessel_reid.data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
 from vessel_reid.models.reid_model import ReIDModel
 from vessel_reid.utils.config import load_config
 from vessel_reid.utils.faiss_index import load_index, load_metadata, search
@@ -15,6 +15,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", required=True, help="Path to inference config YAML")
     parser.add_argument("--image", required=True, help="Path to query image")
     parser.add_argument("--length-m", type=float, default=None, help="Vessel length in meters")
+    parser.add_argument("--heading", type=float, default=None, help="Vessel heading in degrees (0-360)")
     return parser.parse_args()
 
 
@@ -38,9 +39,14 @@ def main() -> None:
     index = load_index(cfg["faiss"]["index_path"])
     metadata = load_metadata(cfg["faiss"]["metadata_path"])
 
-    transform = build_transforms(cfg["query"]["image_size"])
+    transform = build_eval_transforms(cfg["query"]["image_size"])
     image = Image.open(args.image).convert("RGB")
-    image = transform(image).unsqueeze(0).to(device)
+
+    rotate_by_direction = cfg["query"].get("rotate_by_direction", False)
+    if rotate_by_direction and args.heading is not None:
+        image = rotate_and_crop_by_heading(image, args.heading)
+
+    image = apply_transforms(image, transform).unsqueeze(0).to(device)
 
     length_tensor = None
     if cfg["query"]["use_length"]:
