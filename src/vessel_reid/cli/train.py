@@ -207,24 +207,83 @@ def maybe_plot_loss(csv_path: str, out_path: str) -> None:
 
     epochs = []
     losses = []
+    arc_losses = []
+    pos_dists = []
+    neg_dists = []
+    valid_fracs = []
     with open(csv_path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             epochs.append(int(row["epoch"]))
             losses.append(float(row["train_loss"]))
+            if "train_arcface_loss" in row:
+                arc_losses.append(float(row["train_arcface_loss"]))
+            if "train_pos_dist" in row:
+                pos_dists.append(float(row["train_pos_dist"]))
+            if "train_neg_dist" in row:
+                neg_dists.append(float(row["train_neg_dist"]))
+            if "train_valid_frac" in row:
+                valid_fracs.append(float(row["train_valid_frac"]))
 
     if not epochs:
         return
 
-    plt.figure(figsize=(6, 4))
-    plt.plot(epochs, losses, marker="o")
-    plt.xlabel("epoch")
-    plt.ylabel("train_loss")
-    plt.title("training loss")
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(out_path)
-    plt.close()
+    fig, axes = plt.subplots(2, 2, figsize=(10, 7))
+    ax = axes[0, 0]
+    ax.plot(epochs, losses, marker="o", label="total")
+    if arc_losses:
+        ax.plot(epochs, arc_losses, marker="o", label="arcface")
+    ax.set_title("loss")
+    ax.set_xlabel("epoch")
+    ax.set_ylabel("loss")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+
+    ax = axes[0, 1]
+    if pos_dists and neg_dists:
+        ax.plot(epochs, pos_dists, marker="o", label="pos")
+        ax.plot(epochs, neg_dists, marker="o", label="neg")
+    ax.set_title("triplet distances")
+    ax.set_xlabel("epoch")
+    ax.set_ylabel("distance")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+
+    ax = axes[1, 0]
+    if valid_fracs:
+        ax.plot(epochs, valid_fracs, marker="o", label="valid_frac")
+    ax.set_title("valid fraction")
+    ax.set_xlabel("epoch")
+    ax.set_ylabel("fraction")
+    ax.set_ylim(0.0, 1.05)
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+
+    ax = axes[1, 1]
+    ax.axis("off")
+    ax.text(
+        0.0,
+        0.9,
+        f"epochs: {epochs[-1]}",
+        fontsize=10,
+    )
+    ax.text(
+        0.0,
+        0.8,
+        f"final loss: {losses[-1]:.4f}",
+        fontsize=10,
+    )
+    if arc_losses:
+        ax.text(
+            0.0,
+            0.7,
+            f"final arc: {arc_losses[-1]:.4f}",
+            fontsize=10,
+        )
+
+    fig.tight_layout()
+    fig.savefig(out_path)
+    plt.close(fig)
 
 
 def compute_length_stats(csv_path: str) -> Tuple[float, float, int]:
