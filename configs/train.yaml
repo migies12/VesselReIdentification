@@ -28,18 +28,18 @@ model:
 
 train:
   epochs: 40
-  lr: 0.0003
-  weight_decay: 0.0001
+  lr: 0.0001
+  weight_decay: 0.00001
   margin: 0.3
   loss: combined
-  triplet_weight: 1.0
+  triplet_weight: 3.0
   triplet:
-    distance: euclidean
+    distance: cosine
     margin: 0.2
     softplus: true
   arcface_margin: 0.5
   arcface_scale: 30.0
-  arcface_weight: 1.0
+  arcface_weight: 0.5
   log_every: 50
   output_dir: outputs
   checkpoint_name: reid_model.pt
