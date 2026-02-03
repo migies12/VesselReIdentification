@@ -199,32 +199,67 @@ def save_stats_json(path: str, stats: Dict) -> None:
         json.dump(stats, f, indent=2)
 
 
-def maybe_plot_loss(csv_path: str, out_path: str) -> None:
+def maybe_plot_metrics(csv_path: str, out_path: str) -> None:
     try:
         import matplotlib.pyplot as plt
     except ImportError:
         return
 
     epochs = []
-    losses = []
+    metrics: Dict[str, list] = {
+        "train_loss": [],
+        "train_arcface_loss": [],
+        "train_pos_dist": [],
+        "train_neg_dist": [],
+        "train_valid_frac": [],
+    }
     with open(csv_path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
+        if reader.fieldnames is None:
+            return
         for row in reader:
             epochs.append(int(row["epoch"]))
-            losses.append(float(row["train_loss"]))
+            for key in metrics:
+                val = row.get(key)
+                if val is None or val == "":
+                    metrics[key].append(float("nan"))
+                else:
+                    metrics[key].append(float(val))
 
     if not epochs:
         return
 
-    plt.figure(figsize=(6, 4))
-    plt.plot(epochs, losses, marker="o")
-    plt.xlabel("epoch")
-    plt.ylabel("train_loss")
-    plt.title("training loss")
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(out_path)
-    plt.close()
+    fig, axes = plt.subplots(2, 2, figsize=(10, 7), sharex=True)
+    axes = axes.flatten()
+
+    axes[0].plot(epochs, metrics["train_loss"], marker="o", label="train_loss")
+    if any(v == v and v != 0.0 for v in metrics["train_arcface_loss"]):
+        axes[0].plot(epochs, metrics["train_arcface_loss"], marker="o", label="arcface_loss")
+    axes[0].set_title("loss")
+    axes[0].set_ylabel("loss")
+    axes[0].grid(True, alpha=0.3)
+    axes[0].legend()
+
+    axes[1].plot(epochs, metrics["train_pos_dist"], marker="o", label="pos_dist")
+    axes[1].plot(epochs, metrics["train_neg_dist"], marker="o", label="neg_dist")
+    axes[1].set_title("distance stats")
+    axes[1].set_ylabel("distance")
+    axes[1].grid(True, alpha=0.3)
+    axes[1].legend()
+
+    axes[2].plot(epochs, metrics["train_valid_frac"], marker="o", label="valid_frac")
+    axes[2].set_title("valid fraction")
+    axes[2].set_ylabel("fraction")
+    axes[2].set_xlabel("epoch")
+    axes[2].grid(True, alpha=0.3)
+    axes[2].legend()
+
+    axes[3].axis("off")
+
+    fig.suptitle("training metrics", y=1.02)
+    fig.tight_layout()
+    fig.savefig(out_path)
+    plt.close(fig)
 
 
 def compute_length_stats(csv_path: str) -> Tuple[float, float, int]:
@@ -392,7 +427,7 @@ def main() -> None:
         history.append(row)
         append_stats(stats_csv, row)
         save_stats_json(stats_json, history)
-        maybe_plot_loss(stats_csv, stats_plot)
+        maybe_plot_metrics(stats_csv, stats_plot)
 
     checkpoint_path = os.path.join(cfg["train"]["output_dir"], cfg["train"]["checkpoint_name"])
     torch.save(model.state_dict(), checkpoint_path)
