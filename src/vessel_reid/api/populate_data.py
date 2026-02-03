@@ -14,6 +14,8 @@ MIN_IMAGES_PER_VESSEL = 3
 BACKFILL_LOOKBACK_DAYS = 540
 BACKFILL_EVENT_TYPES = ["eo_sentinel2", "eo_landsat_8_9", "sar_sentinel1"]
 BACKFILL_MIN_ESTIMATED_LENGTH = 150
+VERBOSE = os.getenv("POPULATE_VERBOSE", "0") == "1"
+LOG_EVERY_IMAGES = int(os.getenv("POPULATE_LOG_EVERY_IMAGES", "50"))
 
 
 def load_fetched_event_ids(path: Path) -> set:
@@ -112,9 +114,10 @@ if __name__ == "__main__":
     # Log statistics
     print(f"\nTotal vessels detected: {len(vessel_images)}")
     print(f"Total events: {len(all_events)}")
-    print("\nImages per vessel:")
-    for mmsi, events_list in sorted(vessel_images.items(), key=lambda x: len(x[1]), reverse=True):
-        print(f"  Vessel {mmsi}: {len(events_list)} images")
+    if VERBOSE:
+        print("\nImages per vessel:")
+        for mmsi, events_list in sorted(vessel_images.items(), key=lambda x: len(x[1]), reverse=True):
+            print(f"  Vessel {mmsi}: {len(events_list)} images")
 
     # Download images
     saved_count = 0
@@ -160,21 +163,28 @@ if __name__ == "__main__":
 
         return fetched
 
-    for mmsi, events_list in vessel_images.items():
+    total_vessels = len(vessel_images)
+    for idx, (mmsi, events_list) in enumerate(vessel_images.items(), start=1):
+        if idx == 1 or idx % 50 == 0 or idx == total_vessels:
+            print(f"\nProcessing vessels {idx}/{total_vessels}...")
         if len(events_list) < MIN_IMAGES_PER_VESSEL:
-            print(f"\nVessel {mmsi} has only {len(events_list)} images; backfilling...")
+            if VERBOSE:
+                print(f"\nVessel {mmsi} has only {len(events_list)} images; backfilling...")
             backfilled = backfill_vessel_events(mmsi, MIN_IMAGES_PER_VESSEL, seen_event_ids)
             if backfilled:
                 vessel_images[mmsi].extend(backfilled)
                 events_list = vessel_images[mmsi]
-                print(f"  Added {len(backfilled)} images from backfill (total now {len(events_list)})")
+                if VERBOSE:
+                    print(f"  Added {len(backfilled)} images from backfill (total now {len(events_list)})")
 
         if len(events_list) < MIN_IMAGES_PER_VESSEL:
-            print(f"\nSkipping vessel {mmsi} (only {len(events_list)} images, need {MIN_IMAGES_PER_VESSEL})")
+            if VERBOSE:
+                print(f"\nSkipping vessel {mmsi} (only {len(events_list)} images, need {MIN_IMAGES_PER_VESSEL})")
             filtered_count += 1
             continue
 
-        print(f"\nProcessing vessel {mmsi} ({len(events_list)} images)")
+        if VERBOSE:
+            print(f"\nProcessing vessel {mmsi} ({len(events_list)} images)")
         for event in events_list:
             if event["eventId"] in fetched_event_ids:
                 continue
@@ -193,7 +203,8 @@ if __name__ == "__main__":
 
             saved_count += 1
             downloaded_event_ids.add(event["eventId"])
-            print(f"  Saved {output_path.name}")
+            if LOG_EVERY_IMAGES > 0 and saved_count % LOG_EVERY_IMAGES == 0:
+                print(f"  Saved {saved_count} images so far...")
 
             upsert_row(
                 MASTER_CSV_PATH,
