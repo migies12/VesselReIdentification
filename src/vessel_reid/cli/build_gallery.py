@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from vessel_reid.data.dataset import DataConfig, SingleImageDataset
 from vessel_reid.models.reid_model import ReIDModel
-from vessel_reid.utils.config import load_config
+from vessel_reid.utils.config import load_config, load_shared_config
 from vessel_reid.utils.faiss_index import build_index, save_index, save_metadata
 
 
@@ -21,6 +21,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
+    shared_cfg = load_shared_config()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -31,6 +32,7 @@ def main() -> None:
         use_length=cfg["gallery"]["use_length"],
         length_mean=cfg["gallery"]["length_mean"],
         length_std=cfg["gallery"]["length_std"],
+        rotate_by_direction=shared_cfg.get("rotate_by_direction", cfg["gallery"].get("rotate_by_direction", False)),
     )
     dataset = SingleImageDataset(data_cfg)
     loader = DataLoader(dataset, batch_size=64, shuffle=False, num_workers=4)

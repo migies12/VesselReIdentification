@@ -13,7 +13,7 @@ import torch.nn.functional as F
 
 from vessel_reid.data.dataset import DataConfig, LabeledImageDataset, PKBatchSampler
 from vessel_reid.models.reid_model import ReIDModel
-from vessel_reid.utils.config import load_config
+from vessel_reid.utils.config import load_config, load_shared_config
 from vessel_reid.utils.seed import seed_everything
 
 
@@ -294,6 +294,7 @@ def compute_length_stats(csv_path: str) -> Tuple[float, float, int]:
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
+    shared_cfg = load_shared_config()
     seed_everything(cfg["seed"])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -311,7 +312,7 @@ def main() -> None:
         use_length=cfg["data"]["use_length"],
         length_mean=float(length_mean),
         length_std=float(length_std),
-        rotate_by_direction=cfg["data"].get("rotate_by_direction", False),
+        rotate_by_direction=shared_cfg.get("rotate_by_direction", cfg["data"].get("rotate_by_direction", False)),
         augment=cfg["data"].get("augment", True),
     )
     dataset = LabeledImageDataset(data_cfg)

@@ -11,7 +11,6 @@ data:
   compute_length_stats: true
   length_mean: 221.2029
   length_std: 44.8894
-  rotate_by_direction: false
   augment: true
   pk_sampler:
     enabled: true
