@@ -70,7 +70,23 @@ def load_stats(csv_path: str) -> Dict[str, List[float]]:
 
     return data
 
+def keep_last_run(data: Dict[str, List[float]]) -> Dict[str, List[float]]:
+    """Keep only the last training run (after last epoch reset)."""
 
+    epochs = data["epoch"]
+
+    # Find last reset point
+    start = 0
+    for i in range(1, len(epochs)):
+        if epochs[i] < epochs[i - 1]:
+            start = i
+
+    # Slice all fields
+    new_data = {}
+    for k, v in data.items():
+        new_data[k] = v[start:]
+
+    return new_data
 
 def plot_loss_curves(data: Dict[str, List[float]], output_path: str, show: bool = False) -> None:
     """Plot training loss curves."""
@@ -241,7 +257,7 @@ def main() -> None:
         return
 
     print(f"Loading stats from {args.stats_csv}")
-    data = load_stats(args.stats_csv)
+    data = keep_last_run(load_stats(args.stats_csv))
 
     os.makedirs(args.output_dir, exist_ok=True)
 
