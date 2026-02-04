@@ -16,8 +16,9 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_stats(csv_path: str) -> Dict[str, List[float]]:
-    """Load training stats from CSV."""
-    data: Dict[str, List[float]] = {
+    # expected outputs
+    data = {
+        "run_id": [],
         "epoch": [],
         "train_loss": [],
         "train_arcface_loss": [],
@@ -26,21 +27,49 @@ def load_stats(csv_path: str) -> Dict[str, List[float]]:
         "train_valid_frac": [],
     }
 
-    with open(csv_path, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        if reader.fieldnames is None:
-            raise ValueError(f"Empty CSV: {csv_path}")
+    run_id = 0
+    last_epoch = None
 
-        for row in reader:
-            data["epoch"].append(int(row["epoch"]))
-            for key in list(data.keys())[1:]:
-                val = row.get(key, "")
-                if val == "" or val is None:
-                    data[key].append(float("nan"))
-                else:
-                    data[key].append(float(val))
+    with open(csv_path, "r", encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line:
+                continue
+
+            # Start of a new section/run
+            if line.startswith("epoch,"):
+                run_id += 1
+                last_epoch = None
+                continue
+
+            parts = line.split(",")
+            if len(parts) not in (5, 6):
+                print(f"[warn] Skipping malformed line ({len(parts)} fields): {line[:120]}")
+                continue
+
+            # If epochs reset without a header, treat it as a new run
+            epoch = int(parts[0])
+            if last_epoch is not None and epoch < last_epoch:
+                run_id += 1
+            last_epoch = epoch
+
+            # Map fields by width
+            if len(parts) == 5:
+                _, loss, pos, neg, frac = parts
+                arc = float("nan")
+            else:
+                _, loss, arc, pos, neg, frac = parts
+
+            data["run_id"].append(run_id)
+            data["epoch"].append(epoch)
+            data["train_loss"].append(float(loss))
+            data["train_arcface_loss"].append(float(arc) if arc != "" else float("nan"))
+            data["train_pos_dist"].append(float(pos))
+            data["train_neg_dist"].append(float(neg))
+            data["train_valid_frac"].append(float(frac))
 
     return data
+
 
 
 def plot_loss_curves(data: Dict[str, List[float]], output_path: str, show: bool = False) -> None:
