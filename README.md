@@ -37,13 +37,16 @@ Build gallery:
 ```bash
 python -m vessel_reid.cli.build_gallery --config configs/gallery.yaml
 ```
-python -m vessel_reid.cli.build_gallery --config configs/gallery.yaml
 
 Query:
 ```bash
 python -m vessel_reid.cli.infer --config configs/inference.yaml --image path/to/query.jpg --length-m 42.7
 ```
-210872000_16ab5454bffc4531bccff00e60a54e62.jpg,210872000,229
+
+Visualize training metrics:
+```bash
+python -m vessel_reid.cli.visualize --stats-csv outputs/train_stats.csv --output-dir outputs
+```
 ## Notes
 - Assumes each image contains one boat (no detection stage).
 - For evaluation, keep boat IDs disjoint across train/val/test.
