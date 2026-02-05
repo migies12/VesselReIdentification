@@ -1,4 +1,4 @@
-import api_helper
+from vessel_reid.api import api_helper
 from dotenv import load_dotenv
 from collections import defaultdict
 import csv
