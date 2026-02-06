@@ -8,31 +8,31 @@ from tqdm import tqdm
 
 from vessel_reid.data.dataset import DataConfig, SingleImageDataset
 from vessel_reid.models.reid_model import ReIDModel
-from vessel_reid.utils.config import load_config, load_shared_config
+from vessel_reid.utils.config import load_config
 from vessel_reid.utils.faiss_index import build_index, save_index, save_metadata
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build FAISS gallery")
-    parser.add_argument("--config", required=True, help="Path to gallery config YAML")
+    parser.add_argument("--config", default="configs/shared.yaml", help="Path to config YAML")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    shared_cfg = load_shared_config()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     data_cfg = DataConfig(
-        csv_path=cfg["gallery"]["csv_path"],
-        image_root=cfg["gallery"]["image_root"],
-        image_size=cfg["gallery"]["image_size"],
-        use_length=cfg["gallery"]["use_length"],
-        length_mean=cfg["gallery"]["length_mean"],
-        length_std=cfg["gallery"]["length_std"],
-        rotate_by_direction=shared_cfg.get("rotate_by_direction", cfg["gallery"].get("rotate_by_direction", False)),
+        csv_path=cfg["data"]["gallery_csv"],
+        image_root=cfg["data"]["image_root"],
+        image_size=cfg["data"]["image_size"],
+        use_length=cfg["data"]["use_length"],
+        length_mean=cfg["data"]["length_mean"],
+        length_std=cfg["data"]["length_std"],
+        rotate_by_direction=cfg.get("rotate_by_direction", False),
+        crop_ratio=cfg.get("crop_ratio", 0.707),
     )
     dataset = SingleImageDataset(data_cfg)
     loader = DataLoader(dataset, batch_size=64, shuffle=False, num_workers=4)

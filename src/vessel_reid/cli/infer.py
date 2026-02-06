@@ -6,13 +6,13 @@ from PIL import Image
 
 from vessel_reid.data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
 from vessel_reid.models.reid_model import ReIDModel
-from vessel_reid.utils.config import load_config, load_shared_config
+from vessel_reid.utils.config import load_config
 from vessel_reid.utils.faiss_index import load_index, load_metadata, search
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run ReID inference")
-    parser.add_argument("--config", required=True, help="Path to inference config YAML")
+    parser.add_argument("--config", default="configs/shared.yaml", help="Path to config YAML")
     parser.add_argument("--image", required=True, help="Path to query image")
     parser.add_argument("--length-m", type=float, default=None, help="Vessel length in meters")
     parser.add_argument("--heading", type=float, default=None, help="Vessel heading in degrees (0-360)")
@@ -22,7 +22,6 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    shared_cfg = load_shared_config()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -40,20 +39,21 @@ def main() -> None:
     index = load_index(cfg["faiss"]["index_path"])
     metadata = load_metadata(cfg["faiss"]["metadata_path"])
 
-    transform = build_eval_transforms(cfg["query"]["image_size"])
+    transform = build_eval_transforms(cfg["data"]["image_size"])
     image = Image.open(args.image).convert("RGB")
 
-    rotate_by_direction = shared_cfg.get("rotate_by_direction", cfg["query"].get("rotate_by_direction", False))
+    rotate_by_direction = cfg.get("rotate_by_direction", False)
     if rotate_by_direction and args.heading is not None:
-        image = rotate_and_crop_by_heading(image, args.heading)
+        crop_ratio = cfg.get("crop_ratio", 0.707)
+        image = rotate_and_crop_by_heading(image, args.heading, crop_ratio)
 
     image = apply_transforms(image, transform).unsqueeze(0).to(device)
 
     length_tensor = None
-    if cfg["query"]["use_length"]:
+    if cfg["data"]["use_length"]:
         if args.length_m is None:
             raise ValueError("--length-m is required when use_length=true")
-        length = (args.length_m - cfg["query"]["length_mean"]) / (cfg["query"]["length_std"] + 1e-6)
+        length = (args.length_m - cfg["data"]["length_mean"]) / (cfg["data"]["length_std"] + 1e-6)
         length_tensor = torch.tensor([[length]], dtype=torch.float32).to(device)
 
     with torch.no_grad():

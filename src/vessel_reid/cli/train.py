@@ -13,13 +13,13 @@ import torch.nn.functional as F
 
 from vessel_reid.data.dataset import DataConfig, LabeledImageDataset, PKBatchSampler
 from vessel_reid.models.reid_model import ReIDModel
-from vessel_reid.utils.config import load_config, load_shared_config
+from vessel_reid.utils.config import load_config
 from vessel_reid.utils.seed import seed_everything
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train vessel ReID model")
-    parser.add_argument("--config", required=True, help="Path to train config YAML")
+    parser.add_argument("--config", default="configs/shared.yaml", help="Path to config YAML")
     return parser.parse_args()
 
 
@@ -294,7 +294,6 @@ def compute_length_stats(csv_path: str) -> Tuple[float, float, int]:
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
-    shared_cfg = load_shared_config()
     seed_everything(cfg["seed"])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -312,7 +311,8 @@ def main() -> None:
         use_length=cfg["data"]["use_length"],
         length_mean=float(length_mean),
         length_std=float(length_std),
-        rotate_by_direction=shared_cfg.get("rotate_by_direction", cfg["data"].get("rotate_by_direction", False)),
+        rotate_by_direction=cfg.get("rotate_by_direction", False),
+        crop_ratio=cfg.get("crop_ratio", 0.707),
         augment=cfg["data"].get("augment", True),
     )
     dataset = LabeledImageDataset(data_cfg)

@@ -23,30 +23,29 @@ class DataConfig:
     length_mean: float
     length_std: float
     rotate_by_direction: bool = False
+    crop_ratio: float = 0.707
     augment: bool = False
 
 
-def rotate_and_crop_by_heading(image: Image.Image, heading: float) -> Image.Image:
+def rotate_and_crop_by_heading(image: Image.Image, heading: float, crop_ratio: float = 0.707) -> Image.Image:
     """
-    Rotate image to normalize vessel heading and crop to the largest inscribed square.
+    Rotate image to normalize vessel heading and center-crop.
 
     Args:
         image: PIL Image to transform
         heading: Vessel heading in degrees (0-360, where 0 is north)
+        crop_ratio: Fraction of the original size to keep (0-1). Default 0.707
+            (1/sqrt(2)) guarantees no black corners at any rotation angle.
+            Higher values keep more of the image but may include black corners.
 
     Returns:
         Rotated and cropped PIL Image
     """
-    # Rotate image by negative heading to normalize all vessels to face north (0 degrees)
-    # expand=True keeps the full rotated image without clipping corners
     rotated = image.rotate(-heading, resample=Image.BILINEAR, expand=True)
 
-    # Calculate the crop size: side / sqrt(2) ensures valid crop for any rotation
-    # Use the original image dimensions for the calculation
     original_size = min(image.width, image.height)
-    crop_size = int(original_size / math.sqrt(2))
+    crop_size = int(original_size * crop_ratio)
 
-    # Center crop the rotated image
     center_x = rotated.width // 2
     center_y = rotated.height // 2
     half_crop = crop_size // 2
@@ -129,7 +128,7 @@ class TripletDataset(Dataset):
 
         if self.cfg.rotate_by_direction and pd.notna(row.get("heading")):
             heading = float(row["heading"])
-            image = rotate_and_crop_by_heading(image, heading)
+            image = rotate_and_crop_by_heading(image, heading, self.cfg.crop_ratio)
 
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)
@@ -175,7 +174,7 @@ class SingleImageDataset(Dataset):
 
         if self.cfg.rotate_by_direction and pd.notna(row.get("heading")):
             heading = float(row["heading"])
-            image = rotate_and_crop_by_heading(image, heading)
+            image = rotate_and_crop_by_heading(image, heading, self.cfg.crop_ratio)
 
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)
@@ -209,7 +208,7 @@ class LabeledImageDataset(Dataset):
 
         if self.cfg.rotate_by_direction and pd.notna(row.get("heading")):
             heading = float(row["heading"])
-            image = rotate_and_crop_by_heading(image, heading)
+            image = rotate_and_crop_by_heading(image, heading, self.cfg.crop_ratio)
 
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)

@@ -30,17 +30,17 @@ python -m vessel_reid.cli.split_ids --image-dir data/images --out-dir data
 ## Commands
 Train:
 ```bash
-python -m vessel_reid.cli.train --config configs/train.yaml
+python -m vessel_reid.cli.train
 ```
 
 Build gallery:
 ```bash
-python -m vessel_reid.cli.build_gallery --config configs/gallery.yaml
+python -m vessel_reid.cli.build_gallery
 ```
 
 Query:
 ```bash
-python -m vessel_reid.cli.infer --config configs/inference.yaml --image path/to/query.jpg --length-m 42.7
+python -m vessel_reid.cli.infer --image path/to/query.jpg --length-m 42.7
 ```
 
 Visualize training metrics:
@@ -63,7 +63,7 @@ python -m vessel_reid.cli.visualize --stats-csv outputs/train_stats.csv --output
 - **Change**: Added `pin_memory=True` and `persistent_workers=True` to DataLoader
 - **Why**: Makes data loading faster by keeping workers alive and pinning memory
 
-### `configs/train.yaml`
+### `configs/shared.yaml`
 - **Change**: Increased `batch_size` from 32 to 128
 - **Why**: A100 has 40GB of VRAM, was barely using any of it with batch size 32
 

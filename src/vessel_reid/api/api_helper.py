@@ -1,20 +1,19 @@
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+"""Shared helpers for vessel event fetching and image downloading."""
+import csv
 import os
+import re
+from collections import defaultdict
+from pathlib import Path
+
 import requests
+from tqdm import tqdm
+
 
 def get_access_token(username: str, password: str) -> str:
     """
-    Requests and returns a valid access_token for the Skylight API for the given Skylight credentials
-    Access tokens are valid for 24 hours
-    Usage of an access token:
-        headers={
-            "Authorization": f"Bearer {access_token}",
-        },
+    Requests and returns a valid access_token for the Skylight API for the given Skylight credentials.
+    Access tokens are valid for 24 hours.
     """
-    # Note: Skylight API requires credentials to be embedded directly in the query,
-    # not passed as variables
-
     query = f'{{getToken(username: "{username}", password: "{password}") {{access_token expires_in}}}}'
 
     response = requests.post(
@@ -28,214 +27,132 @@ def get_access_token(username: str, password: str) -> str:
     data = response.json()
     if "errors" in data:
         raise RuntimeError(data["errors"])
-    
+
     token_info = data["data"]["getToken"]
     return token_info["access_token"]
 
-def get_recent_correlated_vessels(
-    access_token: str,
-    days: int,
-    offset: int = 0,
-    limit: int = 1000,
-    event_types: Optional[List[str]] = None,
-    min_estimated_length: Optional[float] = 150,
-):
+
+def load_fetched_event_ids(path: Path) -> set:
+    """Load previously fetched event IDs from file."""
+    if not path.exists():
+        return set()
+
+    with open(path, "r", encoding="utf-8") as f:
+        return set(line.strip() for line in f if line.strip())
+
+
+def save_event_ids(path: Path, event_ids: set) -> None:
+    """Merge new event IDs with existing ones and write to file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    existing_ids = load_fetched_event_ids(path)
+    all_ids = existing_ids.union(event_ids)
+
+    with open(path, "w", encoding="utf-8") as f:
+        for event_id in sorted(all_ids):
+            f.write(f"{event_id}\n")
+
+
+def upsert_row(csv_path: Path, row: dict) -> None:
+    """Insert or update a row in the CSV, keyed by image_path."""
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    rows = {}
+
+    if csv_path.exists():
+        with open(csv_path, "r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for existing in reader:
+                if "image_path" in existing:
+                    rows[existing["image_path"]] = existing
+
+    rows[row["image_path"]] = row
+
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        fieldnames = ["image_path", "boat_id", "length_m", "heading", "event_id"]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for key in sorted(rows.keys()):
+            writer.writerow(rows[key])
+
+
+def download_and_save_events(
+    events: list,
+    image_dst: Path,
+    csv_path: Path,
+    event_ids_path: Path,
+) -> None:
+    """Download images for a list of events and save metadata to CSV.
+
+    Skips events that have already been fetched. Handles both full URLs
+    and relative paths (prefixed with IMAGE_BASE_URL env var).
     """
-    Fetch AIS-correlated detections from the Skylight API,
-    including the image and associated metadata
+    fetched_ids = load_fetched_event_ids(event_ids_path)
+    new_events = [e for e in events if e["eventId"] not in fetched_ids]
+    print(f"Skipping {len(events) - len(new_events)} already-fetched events")
 
-    access_token: A valid Skylight API access token obtained via `get_access_token()`
-    days: Number of days to look back from the current time (UTC). Only detections with
-            timestamps greater than or equal to now - days will be returned
-    offset: Pagination offset for fetching results beyond the first page
-    """
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    # Group by vessel for summary
+    vessel_images = defaultdict(list)
+    for event in new_events:
+        mmsi = event["vessels"]["vessel0"]["mmsi"]
+        vessel_images[mmsi].append(event)
 
-    query = """
-        query SearchEventsV2($input: SearchEventsV2Input!) {
-            searchEventsV2(input: $input) {
-                records {
-                    eventId
-                    eventType
-                    start {
-                        time
-                        point { lat lon }
-                    }
-                    end {
-                        time
-                        point { lat lon }
-                    }
-                    vessels {
-                        vessel0 {
-                            mmsi
-                            name
-                            countryCode
-                        }
-                    }
-                    eventDetails {
-                        ... on ImageryMetadataEventDetails {
-                            detectionType
-                            score
-                            estimatedLength
-                            frameIds
-                            imageUrl
-                            orientation
-                        }
-                        ... on ViirsEventDetails {
-                            detectionType
-                            estimatedLength
-                            frameIds
-                            imageUrl
-                        }
-                    }
-                }
-                meta {
-                    total
-                }
-            }
-        }
-    """
+    saved_count = 0
+    failed_count = 0
+    succeeded_event_ids = set()
 
-    if event_types is None:
-        event_types = ["eo_sentinel2"]
-
-    event_details = {"detectionType": {"eq": "ais_correlated"}}
-    if min_estimated_length is not None:
-        event_details["detectionEstimatedLength"] = {"gte": min_estimated_length}
-
-    variables = {
-        "input": {
-            "eventType": {"inc": event_types},
-            "startTime": {"gte": since.isoformat()},
-            "eventDetails": event_details,
-            "limit": limit,
-            "offset": offset,
-            "sortBy": "created",
-            "sortDirection": "desc"
-        }
-    }
-
-    response = requests.post(
-        os.getenv("GRAPHQL_URL"),
-        json={
-            "query": query,
-            "variables": variables
-        },
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        },
-        timeout=30,
+    skylight_base_url = os.getenv(
+        "IMAGE_BASE_URL", "https://cdn.sky-prod-a.skylight.earth"
     )
-    response.raise_for_status()
+    image_dst.mkdir(parents=True, exist_ok=True)
 
-    data = response.json()
-    if "errors" in data:
-        print(f"DEBUG - HTTP Status Code: {response.status_code}")
-        print(f"DEBUG - API Error Response: {data}")
-        if data.get("data", {}).get("searchEventsV2") is None:
-            return {"records": [], "meta": {"total": 0}}
-        raise RuntimeError(data["errors"])
+    all_downloads = [
+        (mmsi, event)
+        for mmsi, event_list in vessel_images.items()
+        for event in event_list
+    ]
 
-    return data["data"]["searchEventsV2"]
+    for mmsi, event in tqdm(all_downloads, desc="Downloading images"):
+        image_url = event["eventDetails"]["imageUrl"]
+        if not image_url.startswith("http"):
+            image_url = f"{skylight_base_url}/{image_url}"
 
+        try:
+            image_response = requests.get(image_url, timeout=30)
+            image_response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            failed_count += 1
+            tqdm.write(f"  Failed to download {image_url}: {e}")
+            continue
 
-def get_recent_correlated_events_for_vessel(
-    access_token: str,
-    mmsi: int,
-    days: int,
-    offset: int = 0,
-    limit: int = 1000,
-    event_types: Optional[List[str]] = None,
-    min_estimated_length: Optional[float] = 150,
-):
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+        safe_event_id = re.sub(r"[^\w\-]", "_", event["eventId"])
+        output_path = image_dst / f"{mmsi}_{safe_event_id}.png"
+        length_m = event["eventDetails"].get("estimatedLength")
+        heading = event["eventDetails"].get("heading")
 
-    query = """
-        query SearchEventsV2($input: SearchEventsV2Input!) {
-            searchEventsV2(input: $input) {
-                records {
-                    eventId
-                    eventType
-                    start {
-                        time
-                        point { lat lon }
-                    }
-                    end {
-                        time
-                        point { lat lon }
-                    }
-                    vessels {
-                        vessel0 {
-                            mmsi
-                            name
-                            countryCode
-                        }
-                    }
-                    eventDetails {
-                        ... on ImageryMetadataEventDetails {
-                            detectionType
-                            score
-                            estimatedLength
-                            frameIds
-                            imageUrl
-                            orientation
-                        }
-                        ... on ViirsEventDetails {
-                            detectionType
-                            estimatedLength
-                            frameIds
-                            imageUrl
-                        }
-                    }
-                }
-                meta {
-                    total
-                }
-            }
-        }
-    """
+        with open(output_path, "wb") as f:
+            f.write(image_response.content)
 
-    if event_types is None:
-        event_types = ["eo_sentinel2"]
+        saved_count += 1
+        succeeded_event_ids.add(event["eventId"])
 
-    event_details = {"detectionType": {"eq": "ais_correlated"}}
-    if min_estimated_length is not None:
-        event_details["detectionEstimatedLength"] = {"gte": min_estimated_length}
+        upsert_row(
+            csv_path,
+            {
+                "image_path": output_path.name,
+                "boat_id": str(mmsi),
+                "length_m": "" if length_m is None else length_m,
+                "heading": "" if heading is None else heading,
+                "event_id": event["eventId"],
+            },
+        )
 
-    variables = {
-        "input": {
-            "eventType": {"inc": event_types},
-            "startTime": {"gte": since.isoformat()},
-            "eventDetails": event_details,
-            "vesselMain": {"mmsi": {"eq": str(mmsi)}},
-            "limit": limit,
-            "offset": offset,
-            "sortBy": "created",
-            "sortDirection": "desc",
-        }
-    }
+        if saved_count % 1000 == 0:
+            save_event_ids(event_ids_path, succeeded_event_ids)
 
-    response = requests.post(
-        os.getenv("GRAPHQL_URL"),
-        json={
-            "query": query,
-            "variables": variables
-        },
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        },
-        timeout=30,
-    )
-    response.raise_for_status()
+    print(f"\n=== Summary ===")
+    print(f"Total vessels: {len(vessel_images)}")
+    print(f"Total images saved: {saved_count}")
+    print(f"Failed downloads: {failed_count}")
 
-    data = response.json()
-    if "errors" in data:
-        print(f"DEBUG - HTTP Status Code: {response.status_code}")
-        print(f"DEBUG - API Error Response: {data}")
-        if data.get("data", {}).get("searchEventsV2") is None:
-            return {"records": [], "meta": {"total": 0}}
-        raise RuntimeError(data["errors"])
-
-    return data["data"]["searchEventsV2"]
+    save_event_ids(event_ids_path, succeeded_event_ids)
+    print(f"Saved {len(succeeded_event_ids)} event IDs to {event_ids_path}")
