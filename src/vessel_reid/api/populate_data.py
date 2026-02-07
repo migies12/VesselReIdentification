@@ -12,7 +12,7 @@ MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
 FETCHED_EVENT_IDS_PATH = IMAGE_DST_PATH.parent / "fetched_event_ids.txt"
 MIN_IMAGES_PER_VESSEL = 3
 BACKFILL_LOOKBACK_DAYS = 540
-BACKFILL_EVENT_TYPES = ["eo_sentinel2", "eo_landsat_8_9", "sar_sentinel1"]
+BACKFILL_EVENT_TYPES = ["eo_sentinel2"]
 BACKFILL_MIN_ESTIMATED_LENGTH = 150
 VERBOSE = os.getenv("POPULATE_VERBOSE", "0") == "1"
 LOG_EVERY_IMAGES = int(os.getenv("POPULATE_LOG_EVERY_IMAGES", "50"))

@@ -77,7 +77,7 @@ def build_train_transforms(image_size: int) -> A.Compose:
                 border_mode=cv2.BORDER_REFLECT_101,
                 p=0.6,
             ),
-            A.GaussianBlur(blur_limit=(3, 5), p=0.2),
+            A.GaussianBlur(blur_limit=(3, 3), p=0.05),
             A.RandomBrightnessContrast(p=0.5),
             A.HueSaturationValue(p=0.3),
             A.GaussNoise(p=0.3),
