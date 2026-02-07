@@ -383,7 +383,7 @@ def main() -> None:
         lr=cfg["train"]["lr"],
         weight_decay=cfg["train"]["weight_decay"],
     )
-    use_amp = device.type == "cuda"
+    use_amp = bool(cfg["train"].get("use_amp", device.type == "cuda"))
     scaler = GradScaler(enabled=use_amp)
 
     os.makedirs(cfg["train"]["output_dir"], exist_ok=True)
