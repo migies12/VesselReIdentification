@@ -18,8 +18,8 @@ faiss:
   normalize: true
 
 data:
-  source: graphql  # "graphql" or "elasticsearch"
-  fetch_days: 30
+  source: elasticsearch  # "graphql" or "elasticsearch"
+  fetch_days: 80
   train_csv: data/train.csv
   val_csv: data/val.csv
   gallery_csv: data/gallery.csv
@@ -43,7 +43,7 @@ train:
   lr: 0.0003
   weight_decay: 0.0001
   margin: 0.3
-  loss: combined
+  loss: triplet
   triplet_weight: 1.0
   triplet:
     distance: euclidean
