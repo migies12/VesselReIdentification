@@ -20,4 +20,6 @@ outputs/
 faiss_index/
 .env
 data/
+venv/
+badData/
 
