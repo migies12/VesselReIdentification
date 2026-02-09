@@ -12,7 +12,7 @@ data:
   length_mean: 221.2029
   length_std: 44.8894
   rotate_by_direction: false
-  augment: true
+  augment: false
   pk_sampler:
     enabled: true
     p: 8
