@@ -15,6 +15,7 @@ from vessel_reid.utils.faiss_index import build_index, save_index, save_metadata
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build FAISS gallery")
     parser.add_argument("--config", required=True, help="Path to gallery config YAML")
+    parser.add_argument("--checkpoint", default=None, help="Path to model checkpoint (.pt)")
     return parser.parse_args()
 
 
@@ -42,7 +43,8 @@ def main() -> None:
         length_embed_dim=cfg["model"]["length_embed_dim"],
         pretrained=False,
     ).to(device)
-    state = torch.load(cfg["model"]["checkpoint"], map_location=device)
+    checkpoint_path = args.checkpoint or cfg["model"]["checkpoint"]
+    state = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(state)
     model.eval()
 

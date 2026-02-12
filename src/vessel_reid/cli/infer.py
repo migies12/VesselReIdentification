@@ -16,6 +16,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image", required=True, help="Path to query image")
     parser.add_argument("--length-m", type=float, default=None, help="Vessel length in meters")
     parser.add_argument("--heading", type=float, default=None, help="Vessel heading in degrees (0-360)")
+    parser.add_argument("--checkpoint", default=None, help="Path to model checkpoint (.pt)")
     return parser.parse_args()
 
 
@@ -32,7 +33,8 @@ def main() -> None:
         length_embed_dim=cfg["model"]["length_embed_dim"],
         pretrained=False,
     ).to(device)
-    state = torch.load(cfg["model"]["checkpoint"], map_location=device)
+    checkpoint_path = args.checkpoint or cfg["model"]["checkpoint"]
+    state = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(state)
     model.eval()
 
