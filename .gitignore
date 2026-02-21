@@ -19,5 +19,4 @@ checkpoints/
 outputs/
 faiss_index/
 .env
-data/
-
+dataset/images/

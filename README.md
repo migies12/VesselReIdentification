@@ -11,7 +11,7 @@ pip install -e .
 ```
 
 ## Data layout
-See `data/README.md` for the expected CSV format and folder structure.
+See `dataset/README.md` for the expected CSV format and folder structure.
 
 ## Typical workflow
 1) Prepare ID-disjoint splits (train/val/gallery/query).
@@ -21,11 +21,11 @@ See `data/README.md` for the expected CSV format and folder structure.
 
 Generate splits:
 ```bash
-python -m vessel_reid.cli.split_ids --csv data/all_labels.csv --out-dir data
+python -m vessel_reid.cli.split_ids --csv dataset/all_labels.csv --out-dir data
 ```
 Or generate splits directly from image filenames:
 ```bash
-python -m vessel_reid.cli.split_ids --image-dir data/images --out-dir data
+python -m vessel_reid.cli.split_ids --image-dir dataset/images --out-dir data
 ```
 ## Commands
 Train:
@@ -91,5 +91,5 @@ python -m vessel_reid.cli.visualize --stats-csv outputs/train_stats.csv --output
 - **Change**: Added pagination loop to fetch all available results
 - **Why**: Don't miss any data if there are more than 1000 events in the time window
 
-- **Change**: Save fetched event IDs to `data/fetched_event_ids.txt`
+- **Change**: Save fetched event IDs to `dataset/fetched_event_ids.txt`
 - **Why**: Track which events were fetched for future reproducibility
