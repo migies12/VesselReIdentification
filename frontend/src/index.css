@@ -1,0 +1,265 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #0f1117;
+  color: #e2e8f0;
+  min-height: 100vh;
+}
+
+/* ── Layout ─────────────────────────────────────────── */
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── Header ──────────────────────────────────────────── */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #2d3748;
+}
+
+.app-header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #f7fafc;
+}
+
+.nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-controls button {
+  background: #2d3748;
+  color: #e2e8f0;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.nav-controls button:hover:not(:disabled) {
+  background: #4a5568;
+}
+
+.nav-controls button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.nav-counter {
+  font-size: 0.875rem;
+  color: #a0aec0;
+  min-width: 60px;
+  text-align: center;
+}
+
+/* ── Status messages ─────────────────────────────────── */
+
+.status-msg {
+  text-align: center;
+  padding: 16px;
+  color: #a0aec0;
+  font-size: 0.9rem;
+}
+
+.status-msg.error {
+  color: #fc8181;
+}
+
+/* ── Main panel (image + details) ────────────────────── */
+
+.main-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 700px) {
+  .main-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.query-image-box {
+  background: #1a202c;
+  border: 1px solid #2d3748;
+  border-radius: 10px;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.query-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.image-placeholder {
+  color: #4a5568;
+  font-size: 0.875rem;
+}
+
+/* ── Details table ───────────────────────────────────── */
+
+.event-details {
+  background: #1a202c;
+  border: 1px solid #2d3748;
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.event-details h2 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #a0aec0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.details-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.details-table th,
+.details-table td {
+  padding: 6px 0;
+  vertical-align: top;
+}
+
+.details-table th {
+  color: #718096;
+  font-weight: 500;
+  width: 38%;
+  padding-right: 12px;
+}
+
+.details-table td {
+  color: #e2e8f0;
+  word-break: break-all;
+}
+
+.details-table tr + tr th,
+.details-table tr + tr td {
+  border-top: 1px solid #2d3748;
+}
+
+.tag-match {
+  color: #68d391;
+  font-weight: 600;
+}
+
+.tag-no-match {
+  color: #fc8181;
+  font-weight: 600;
+}
+
+/* ── Matches section ─────────────────────────────────── */
+
+.matches-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.matches-section h2 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #a0aec0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.matches-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .matches-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.match-card {
+  background: #1a202c;
+  border: 1px solid #2d3748;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.match-image-box {
+  aspect-ratio: 1;
+  background: #0f1117;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.match-image-box.no-image::after {
+  content: "Image unavailable";
+  color: #4a5568;
+  font-size: 0.75rem;
+}
+
+.match-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.match-info {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.match-score {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #63b3ed;
+  line-height: 1;
+}
+
+.match-detail {
+  font-size: 0.8rem;
+  color: #a0aec0;
+  display: flex;
+  gap: 8px;
+}
+
+.match-detail span {
+  color: #718096;
+  min-width: 40px;
+}

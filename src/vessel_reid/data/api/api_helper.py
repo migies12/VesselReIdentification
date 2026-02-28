@@ -121,18 +121,17 @@ def get_recent_correlated_vessels(access_token: str, days: int):
         response.raise_for_status()
 
         data = response.json()
-        if "errors" in data:
-            print(f"DEBUG - HTTP Status Code: {response.status_code}")
-            print(f"DEBUG - API Error Response: {data}")
-            raise RuntimeError(data["errors"])
-        
+        if "errors" in data or data.get("data", {}).get("searchEventsV2") is None:
+            print(f"Warning: Skylight API error for day {delta}, skipping. Response: {data.get('errors')}")
+            continue
+
         events = data["data"]["searchEventsV2"]
         records = events.get("records", [])
         total = events.get("meta", {}).get("total", 0)
-        
+
         all_records.extend(records)
         total_count += total
-        
+
         print(f"Day {delta}: Retrieved {len(records)} events (total for this day: {total})")
 
     return {

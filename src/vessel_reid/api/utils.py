@@ -1,11 +1,20 @@
+import base64
 import io
+import os
+
 import numpy as np
+import requests
+from dotenv import load_dotenv
 from PIL import Image
 import torch
 
+from ..data.api.api_helper import get_access_token, get_recent_correlated_vessels
 from ..data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
 from ..models.reid_model import ReIDModel
 from ..utils.faiss_index import load_index, load_metadata, search
+
+load_dotenv()
+
 
 def load_model(cfg, device, model_path):
     model = ReIDModel(
@@ -20,6 +29,7 @@ def load_model(cfg, device, model_path):
     model.eval()
     return model
 
+
 def transform_image(cfg, img, heading, device):
     transform = build_eval_transforms(cfg["query"]["image_size"])
     image = Image.open(io.BytesIO(img)).convert("RGB")
@@ -28,6 +38,7 @@ def transform_image(cfg, img, heading, device):
         image = rotate_and_crop_by_heading(image, heading)
     image = apply_transforms(image, transform).unsqueeze(0).to(device)
     return image
+
 
 def generate_embedding(cfg, image, length_m, model, device):
     length_tensor = None
@@ -41,6 +52,7 @@ def generate_embedding(cfg, image, length_m, model, device):
         embedding = model(image, length_tensor).cpu().numpy().astype(np.float32)
 
     return embedding
+
 
 def similarity_search(cfg, embedding):
     index = load_index(cfg["faiss"]["index_path"])
@@ -61,10 +73,59 @@ def similarity_search(cfg, embedding):
         if idx < 0 or idx >= len(metadata):
             continue
         results.append({"score": float(score), **metadata[idx]})
-    
+
     matched = results and results[0]["score"] >= cfg["query"]["similarity_threshold"]
     return {
         "matched": matched,
         "top_match": results[0] if results else None,
         "all_results": results,
     }
+
+
+def fetch_skylight_events(days=7):
+    """Fetch recent Sentinel-2 vessel detection events from Skylight API.
+
+    Returns a list of event dicts with fields needed by the frontend.
+    Uses the same length >= 150m constraint as the training data pipeline.
+    """
+    username = os.getenv("SKYLIGHT_USERNAME")
+    password = os.getenv("SKYLIGHT_PASSWORD")
+    if not username or not password:
+        raise RuntimeError("SKYLIGHT_USERNAME and SKYLIGHT_PASSWORD must be set in .env")
+
+    access_token = get_access_token(username, password)
+    response = get_recent_correlated_vessels(access_token, days)
+
+    events = []
+    for record in response["records"]:
+        details = record.get("eventDetails", {})
+        vessel_info = record.get("vessels", {}).get("vessel0", {})
+        start = record.get("start", {})
+        point = start.get("point", {})
+
+        events.append({
+            "event_id": record["eventId"],
+            "event_type": record.get("eventType"),
+            "mmsi": vessel_info.get("mmsi"),
+            "vessel_name": vessel_info.get("name"),
+            "vessel_type": vessel_info.get("vesselType"),
+            "country_code": vessel_info.get("countryCode"),
+            "image_url": details.get("imageUrl"),
+            "estimated_length": details.get("estimatedLength"),
+            "orientation": details.get("orientation"),
+            "detection_score": details.get("score"),
+            "lat": point.get("lat"),
+            "lon": point.get("lon"),
+            "time": start.get("time"),
+        })
+
+    return events
+
+
+def download_image(image_url):
+    """Download an image from a URL and return (raw_bytes, base64_string)."""
+    resp = requests.get(image_url, timeout=30)
+    resp.raise_for_status()
+    img_data = resp.content
+    img_b64 = base64.b64encode(img_data).decode("utf-8")
+    return img_data, img_b64

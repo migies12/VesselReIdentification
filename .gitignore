@@ -14,9 +14,13 @@ build/
 *.npy
 *.csv
 *.json
+!frontend/package.json
+!frontend/tsconfig.json
 runs/
 checkpoints/
 outputs/
 faiss_index/
 .env
 dataset/images/
+frontend/node_modules/
+frontend/dist/
