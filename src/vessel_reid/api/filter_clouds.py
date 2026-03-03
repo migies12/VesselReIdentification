@@ -2,35 +2,71 @@ import numpy as np
 import rasterio
 import os
 from pathlib import Path
+import shutil
 
 DATASET_PATH = Path(__file__).resolve().parent / "../../../data/images"
+OUTPUT_PATH = Path(__file__).resolve().parent / "dryrun_filtered_images"
+
 DRY_RUN = True
 
-def is_cloudy(image_path, brightness_threshold=210, coverage_threshold=0.15):
+BRIGHTNESS_THRESHOLD = 150
+COVERAGE_THRESHOLD = 0.05
+
+LUMINANCE_R = 0.3
+LUMINANCE_G = 0.6
+LUMINANCE_B = 0.1
+
+def is_cloudy(image_path):
     """
-    Returns True if image is cloudy, else False
+    Returns True if image is too cloudy, else False
     """
     with rasterio.open(image_path) as img:
         if img.count < 3:
             return False
         data = img.read([1, 2, 3])
 
-    cloud_mask = np.all(data > brightness_threshold, axis=0)
-    cloud_fraction = np.sum(cloud_mask) / cloud_mask.size
-    return cloud_fraction > coverage_threshold
+    # Luminance
+    luminance = (LUMINANCE_R * data[0]) + (LUMINANCE_G * data[1]) + (LUMINANCE_B * data[2])
+    brightness_mask = luminance > BRIGHTNESS_THRESHOLD
+    cloud_fraction = np.sum(brightness_mask) / brightness_mask.size
+
+    return cloud_fraction > COVERAGE_THRESHOLD
+
+def setup_dryrun_folder(path):
+    if path.exists():
+        print(f"Clearing existing files in {OUTPUT_PATH}")
+        shutil.rmtree(path, ignore_errors=True)
+    
+    path.mkdir(parents=True, exist_ok=True)
 
 if __name__ == "__main__":
-    total_images = 0
-    cloudy_images = 0
+    total_images_count = 0
+    cloudy_images_count = 0
+
+    kept_images = []
+    cloudy_images = []
+
+    setup_dryrun_folder(OUTPUT_PATH)
 
     for filename in os.listdir(DATASET_PATH):
         path = os.path.join(DATASET_PATH, filename)
         if is_cloudy(path):
             print(f"Removing {filename}: Too cloudy")
-            cloudy_images += 1
+            cloudy_images.append(filename)
+            cloudy_images_count += 1
             if not DRY_RUN:
                 os.remove(path)
-        total_images += 1
+        else:
+            if DRY_RUN:
+                shutil.copy2(path, OUTPUT_PATH / filename)
+            kept_images.append(filename)
+        total_images_count += 1
 
-    print(f"Removed {cloudy_images} cloudy images from {total_images} total images")
-    print(f"{total_images - cloudy_images} images remaining")
+    with open("to_discard.txt", "w") as f:
+        f.write("\n".join(cloudy_images))
+
+    with open("to_keep.txt", "w") as f:
+        f.write("\n".join(kept_images))
+
+    print(f"Removed {cloudy_images_count} cloudy images from {total_images_count} total images")
+    print(f"{total_images_count - cloudy_images_count} images remaining")
