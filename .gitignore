@@ -20,4 +20,5 @@ outputs/
 faiss_index/
 .env
 data/
+dryrun_filtered_images/
 

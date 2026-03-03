@@ -9,7 +9,8 @@ OUTPUT_PATH = Path(__file__).resolve().parent / "dryrun_filtered_images"
 
 DRY_RUN = True
 
-BRIGHTNESS_THRESHOLD = 150
+BRIGHTNESS_THRESHOLD = 135
+SATURATION_THRESHOLD = 45
 COVERAGE_THRESHOLD = 0.05
 
 LUMINANCE_R = 0.3
@@ -25,10 +26,10 @@ def is_cloudy(image_path):
             return False
         data = img.read([1, 2, 3])
 
-    # Luminance
     luminance = (LUMINANCE_R * data[0]) + (LUMINANCE_G * data[1]) + (LUMINANCE_B * data[2])
-    brightness_mask = luminance > BRIGHTNESS_THRESHOLD
-    cloud_fraction = np.sum(brightness_mask) / brightness_mask.size
+    colour_diff = np.max(data, axis=0) - np.min(data, axis=0)
+    cloud_mask = (luminance > BRIGHTNESS_THRESHOLD) | (colour_diff < SATURATION_THRESHOLD)
+    cloud_fraction = np.sum(cloud_mask) / cloud_mask.size
 
     return cloud_fraction > COVERAGE_THRESHOLD
 
@@ -40,11 +41,8 @@ def setup_dryrun_folder(path):
     path.mkdir(parents=True, exist_ok=True)
 
 if __name__ == "__main__":
-    total_images_count = 0
-    cloudy_images_count = 0
-
-    kept_images = []
-    cloudy_images = []
+    total_images = 0
+    cloudy_images = 0
 
     setup_dryrun_folder(OUTPUT_PATH)
 
@@ -52,21 +50,13 @@ if __name__ == "__main__":
         path = os.path.join(DATASET_PATH, filename)
         if is_cloudy(path):
             print(f"Removing {filename}: Too cloudy")
-            cloudy_images.append(filename)
-            cloudy_images_count += 1
+            cloudy_images += 1
             if not DRY_RUN:
                 os.remove(path)
         else:
             if DRY_RUN:
                 shutil.copy2(path, OUTPUT_PATH / filename)
-            kept_images.append(filename)
-        total_images_count += 1
+        total_images += 1
 
-    with open("to_discard.txt", "w") as f:
-        f.write("\n".join(cloudy_images))
-
-    with open("to_keep.txt", "w") as f:
-        f.write("\n".join(kept_images))
-
-    print(f"Removed {cloudy_images_count} cloudy images from {total_images_count} total images")
-    print(f"{total_images_count - cloudy_images_count} images remaining")
+    print(f"Removed {cloudy_images} cloudy images from {total_images} total images")
+    print(f"{total_images - cloudy_images} images remaining")
