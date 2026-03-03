@@ -18,21 +18,37 @@ LUMINANCE_R = 0.3
 LUMINANCE_G = 0.6
 LUMINANCE_B = 0.1
 
-def is_cloudy(image_path):
-    """
-    Returns True if image is too cloudy, else False
-    """
-    with rasterio.open(image_path) as img:
-        if img.count < 3:
-            return False
-        data = img.read([1, 2, 3])
-
+def is_cloudy(data):
     luminance = (LUMINANCE_R * data[0]) + (LUMINANCE_G * data[1]) + (LUMINANCE_B * data[2])
     colour_diff = np.max(data, axis=0) - np.min(data, axis=0)
     cloud_mask = (luminance > BRIGHTNESS_THRESHOLD) & (colour_diff < SATURATION_THRESHOLD)
     cloud_fraction = np.sum(cloud_mask) / cloud_mask.size
 
     return cloud_fraction > COVERAGE_THRESHOLD
+
+def is_cloudy_filepath(image_path):
+    """
+    Returns True if image at the filepath is too cloudy, else False
+    """
+    with rasterio.open(image_path) as img:
+        if img.count < 3:
+            return False
+        data = img.read([1, 2, 3])
+
+    return is_cloudy(data)
+
+def is_cloudy_bytes(image_bytes):
+    """
+    Same as above, but takes image bytes instead of filename
+    For integration with the data fetching script
+    """
+    with rasterio.MemoryFile(image_bytes) as memfile:
+        with memfile.open() as img:
+            if img.count < 3:
+                return True
+            data = img.read([1, 2, 3]).astype(float)
+
+    return is_cloudy(data)
 
 def setup_dryrun_folder(path):
     if path.exists():
@@ -50,7 +66,7 @@ if __name__ == "__main__":
 
     for filename in os.listdir(DATASET_PATH):
         path = os.path.join(DATASET_PATH, filename)
-        if is_cloudy(path):
+        if is_cloudy_filepath(path):
             print(f"Removing {filename}: Too cloudy")
             cloudy_images += 1
             if not DRY_RUN:
