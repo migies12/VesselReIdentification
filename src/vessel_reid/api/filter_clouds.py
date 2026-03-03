@@ -6,11 +6,12 @@ import shutil
 
 DATASET_PATH = Path(__file__).resolve().parent / "../../../data/images"
 OUTPUT_PATH = Path(__file__).resolve().parent / "dryrun_filtered_images"
+FILTERED_PATH = Path(__file__).resolve().parent / "dryrun_deleted_images"
 
 DRY_RUN = True
 
-BRIGHTNESS_THRESHOLD = 135
-SATURATION_THRESHOLD = 45
+BRIGHTNESS_THRESHOLD = 115
+SATURATION_THRESHOLD = 65
 COVERAGE_THRESHOLD = 0.05
 
 LUMINANCE_R = 0.3
@@ -28,7 +29,7 @@ def is_cloudy(image_path):
 
     luminance = (LUMINANCE_R * data[0]) + (LUMINANCE_G * data[1]) + (LUMINANCE_B * data[2])
     colour_diff = np.max(data, axis=0) - np.min(data, axis=0)
-    cloud_mask = (luminance > BRIGHTNESS_THRESHOLD) | (colour_diff < SATURATION_THRESHOLD)
+    cloud_mask = (luminance > BRIGHTNESS_THRESHOLD) & (colour_diff < SATURATION_THRESHOLD)
     cloud_fraction = np.sum(cloud_mask) / cloud_mask.size
 
     return cloud_fraction > COVERAGE_THRESHOLD
@@ -45,6 +46,7 @@ if __name__ == "__main__":
     cloudy_images = 0
 
     setup_dryrun_folder(OUTPUT_PATH)
+    setup_dryrun_folder(FILTERED_PATH)
 
     for filename in os.listdir(DATASET_PATH):
         path = os.path.join(DATASET_PATH, filename)
@@ -53,6 +55,8 @@ if __name__ == "__main__":
             cloudy_images += 1
             if not DRY_RUN:
                 os.remove(path)
+            else:
+                shutil.copy2(path, FILTERED_PATH / filename)
         else:
             if DRY_RUN:
                 shutil.copy2(path, OUTPUT_PATH / filename)
