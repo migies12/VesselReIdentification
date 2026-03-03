@@ -1,11 +1,10 @@
 import api_helper
-from dotenv import load_dotenv
 from collections import defaultdict
 import csv
+from dotenv import load_dotenv
 import os
 from pathlib import Path
 import requests
-from uuid import uuid4
 
 IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
 MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
@@ -192,7 +191,7 @@ if __name__ == "__main__":
             image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
             image_response.raise_for_status()
 
-            output_path = IMAGE_DST_PATH / f"{mmsi}_{uuid4().hex}.jpg"
+            output_path = IMAGE_DST_PATH / f"{mmsi}_{event["eventId"]}.jpg"
             length_m = event["eventDetails"].get("estimatedLength")
 
             if not IMAGE_DST_PATH.exists():
