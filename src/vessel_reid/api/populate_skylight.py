@@ -1,4 +1,4 @@
-import api_helper
+import api_helper_skylight as api_helper
 from collections import defaultdict
 import csv
 from dotenv import load_dotenv
@@ -194,7 +194,7 @@ if __name__ == "__main__":
             image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
             image_response.raise_for_status()
 
-            output_path = IMAGE_DST_PATH / f"{mmsi}_{event["eventId"]}.jpg"
+            output_path = IMAGE_DST_PATH / f"{mmsi}_{event["eventId"]}.png"
             length_m = event["eventDetails"].get("estimatedLength")
 
             if not IMAGE_DST_PATH.exists():
