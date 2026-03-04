@@ -1,9 +1,10 @@
-import numpy as np
-import rasterio
+from collections import defaultdict
 import os
 from pathlib import Path
-from collections import defaultdict
 import shutil
+
+import numpy as np
+import rasterio
 
 from config import (
     MIN_IMAGES_PER_VESSEL,
@@ -29,6 +30,7 @@ def is_cloudy(data):
 
     return cloud_fraction > COVERAGE_THRESHOLD
 
+
 def is_cloudy_filepath(image_path):
     """
     Returns True if image at the filepath is too cloudy, else False
@@ -39,6 +41,7 @@ def is_cloudy_filepath(image_path):
         data = img.read([1, 2, 3])
 
     return is_cloudy(data)
+
 
 def is_cloudy_bytes(image_bytes):
     """
@@ -53,11 +56,12 @@ def is_cloudy_bytes(image_bytes):
 
     return is_cloudy(data)
 
+
 def setup_dryrun_folder(path):
     if path.exists():
         print(f"Clearing existing files in {OUTPUT_PATH}")
         shutil.rmtree(path, ignore_errors=True)
-    
+
     path.mkdir(parents=True, exist_ok=True)
 
 if __name__ == "__main__":

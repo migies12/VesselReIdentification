@@ -7,8 +7,7 @@ import re
 import requests
 from tqdm import tqdm
 
-from config import MIN_IMAGES_PER_VESSEL
-from data_utils import load_fetched_event_ids, save_event_ids, upsert_row
+import data_utils
 
 IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
 MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
@@ -20,7 +19,7 @@ def run(days: int = 30) -> None:
 
     all_events = api_helper_elastic.get_events_from_elasticsearch(days=days)
 
-    fetched_ids = load_fetched_event_ids(FETCHED_EVENT_IDS_PATH)
+    fetched_ids = data_utils.load_fetched_event_ids(FETCHED_EVENT_IDS_PATH)
     new_events = [e for e in all_events if e['eventId'] not in fetched_ids]
     print(f"Skipping {len(all_events) - len(new_events)} already-fetched events")
 
@@ -61,7 +60,7 @@ def run(days: int = 30) -> None:
         saved_count += 1
         succeeded_event_ids.add(event['eventId'])
 
-        upsert_row(
+        data_utils.upsert_row(
             MASTER_CSV_PATH,
             {
                 "image_path": output_path.name,
@@ -72,12 +71,12 @@ def run(days: int = 30) -> None:
         )
 
         if saved_count % 1000 == 0:
-            save_event_ids(FETCHED_EVENT_IDS_PATH, succeeded_event_ids)
+            data_utils.save_event_ids(FETCHED_EVENT_IDS_PATH, succeeded_event_ids)
 
     print(f"\n=== Summary ===")
     print(f"Total vessels: {len(vessel_images)}")
     print(f"Total images saved: {saved_count}")
     print(f"Failed downloads: {failed_count}")
 
-    save_event_ids(FETCHED_EVENT_IDS_PATH, succeeded_event_ids)
+    data_utils.save_event_ids(FETCHED_EVENT_IDS_PATH, succeeded_event_ids)
     print(f"Saved {len(succeeded_event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")

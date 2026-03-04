@@ -1,4 +1,6 @@
 import argparse
+import importlib
+
 from config import DEFAULT_DATA_SOURCE
 
 SOURCES = {
@@ -22,5 +24,5 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    populate = __import__(SOURCES[args.source])
+    populate = importlib.import_module(SOURCES[args.source])
     populate.run(days=args.days)

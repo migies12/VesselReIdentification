@@ -11,7 +11,7 @@ from config import (
     BACKFILL_EVENT_TYPES,
     BACKFILL_MIN_ESTIMATED_LENGTH,
 )
-from data_utils import load_fetched_event_ids, save_event_ids, upsert_row
+import data_utils
 
 IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
 MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
@@ -23,7 +23,7 @@ LOG_EVERY_IMAGES = int(os.getenv("POPULATE_LOG_EVERY_IMAGES", "50"))
 def run(days: int = 30) -> None:
     load_dotenv()
     access_token = api_helper.get_access_token(os.getenv("SKYLIGHT_USERNAME"), os.getenv("SKYLIGHT_PASSWORD"))
-    fetched_event_ids = load_fetched_event_ids(FETCHED_EVENT_IDS_PATH)
+    fetched_event_ids = data_utils.load_fetched_event_ids(FETCHED_EVENT_IDS_PATH)
 
     # Fetch all pages of results
     all_events = []
@@ -163,7 +163,7 @@ def run(days: int = 30) -> None:
             if LOG_EVERY_IMAGES > 0 and saved_count % LOG_EVERY_IMAGES == 0:
                 print(f"  Saved {saved_count} images so far...")
 
-            upsert_row(
+            data_utils.upsert_row(
                 MASTER_CSV_PATH,
                 {
                     "image_path": output_path.name,
@@ -179,5 +179,5 @@ def run(days: int = 30) -> None:
     print(f"Vessels saved: {len(vessel_images) - filtered_count}")
     print(f"Total images saved: {saved_count}")
 
-    save_event_ids(FETCHED_EVENT_IDS_PATH, downloaded_event_ids)
+    data_utils.save_event_ids(FETCHED_EVENT_IDS_PATH, downloaded_event_ids)
     print(f"\nSaved {len(downloaded_event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
