@@ -57,10 +57,12 @@ def upsert_row(csv_path: Path, row: dict) -> None:
                 if "image_path" in existing:
                     rows[existing["image_path"]] = existing
 
-    rows[row["image_path"]] = row
+    # Merge with existing row so fields not in the new row (e.g. cloud_coverage) are preserved
+    existing = rows.get(row["image_path"], {})
+    rows[row["image_path"]] = {**existing, **row}
 
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES, restval="", extrasaction="ignore")
         writer.writeheader()
         for key in sorted(rows.keys()):
             writer.writerow(rows[key])
