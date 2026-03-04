@@ -6,13 +6,16 @@ import os
 from pathlib import Path
 import requests
 
+from config import (
+    MIN_IMAGES_PER_VESSEL,
+    BACKFILL_LOOKBACK_DAYS,
+    BACKFILL_EVENT_TYPES,
+    BACKFILL_MIN_ESTIMATED_LENGTH,
+)
+
 IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
 MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
 FETCHED_EVENT_IDS_PATH = IMAGE_DST_PATH.parent / "fetched_event_ids.txt"
-MIN_IMAGES_PER_VESSEL = 3
-BACKFILL_LOOKBACK_DAYS = 540
-BACKFILL_EVENT_TYPES = ["eo_sentinel2", "eo_landsat_8_9", "sar_sentinel1"]
-BACKFILL_MIN_ESTIMATED_LENGTH = 150
 VERBOSE = os.getenv("POPULATE_VERBOSE", "0") == "1"
 LOG_EVERY_IMAGES = int(os.getenv("POPULATE_LOG_EVERY_IMAGES", "50"))
 

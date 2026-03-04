@@ -5,22 +5,21 @@ from pathlib import Path
 from collections import defaultdict
 import shutil
 
-from populate_data import MIN_IMAGES_PER_VESSEL
+from config import (
+    MIN_IMAGES_PER_VESSEL,
+    DRY_RUN,
+    BRIGHTNESS_THRESHOLD,
+    SATURATION_THRESHOLD,
+    COVERAGE_THRESHOLD,
+    LUMINANCE_R,
+    LUMINANCE_G,
+    LUMINANCE_B,
+)
 
 DATASET_PATH = Path(__file__).resolve().parent / "../../../data/images"
 OUTPUT_PATH = Path(__file__).resolve().parent / "dryrun_filtered_images"
 FILTERED_PATH = Path(__file__).resolve().parent / "dryrun_deleted_images"
 EXCLUDED_PATH = Path(__file__).resolve().parent / "dryrun_excluded_vessels"
-
-DRY_RUN = True
-
-BRIGHTNESS_THRESHOLD = 115
-SATURATION_THRESHOLD = 65
-COVERAGE_THRESHOLD = 0.05
-
-LUMINANCE_R = 0.3
-LUMINANCE_G = 0.6
-LUMINANCE_B = 0.1
 
 def is_cloudy(data):
     luminance = (LUMINANCE_R * data[0]) + (LUMINANCE_G * data[1]) + (LUMINANCE_B * data[2])
