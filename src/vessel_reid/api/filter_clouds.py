@@ -1,3 +1,12 @@
+"""
+This file contains both a standalone script for filtering out the cloudy images from an existing dataset,
+and a helper function for filtering out cloudy images when fetching them from the API (`is_cloudy_bytes`)
+
+Both methods rely on the same criteria for classifying an image as "cloudy", contained in the `is_cloudy` function
+This function uses thresholds for brightness and saturation that can be adjusted. I found their current values through
+trial and error and manual inspection, and the results are moderately successful
+"""
+
 import numpy as np
 import rasterio
 import os
