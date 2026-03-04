@@ -80,6 +80,7 @@ def get_recent_correlated_vessels(
                             frameIds
                             imageUrl
                             orientation
+                            heading
                         }
                         ... on ViirsEventDetails {
                             detectionType
@@ -180,6 +181,7 @@ def get_recent_correlated_events_for_vessel(
                             frameIds
                             imageUrl
                             orientation
+                            heading
                         }
                         ... on ViirsEventDetails {
                             detectionType
