@@ -1,3 +1,6 @@
+# Data source ("skylight" or "elasticsearch")
+DEFAULT_DATA_SOURCE = "gql"
+
 # Vessel filtering
 MIN_IMAGES_PER_VESSEL = 3
 

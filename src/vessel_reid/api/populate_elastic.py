@@ -15,15 +15,10 @@ MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
 FETCHED_EVENT_IDS_PATH = IMAGE_DST_PATH.parent / "fetched_event_ids.txt"
 
 
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description="Fetch vessel images from Elasticsearch")
-    parser.add_argument("--days", type=int, default=30, help="Number of days to look back (default: 30)")
-    args = parser.parse_args()
-
+def run(days: int = 30) -> None:
     load_dotenv()
 
-    all_events = api_helper_elastic.get_events_from_elasticsearch(days=args.days)
+    all_events = api_helper_elastic.get_events_from_elasticsearch(days=days)
 
     fetched_ids = load_fetched_event_ids(FETCHED_EVENT_IDS_PATH)
     new_events = [e for e in all_events if e['eventId'] not in fetched_ids]

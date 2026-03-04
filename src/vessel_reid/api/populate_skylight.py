@@ -20,8 +20,7 @@ VERBOSE = os.getenv("POPULATE_VERBOSE", "0") == "1"
 LOG_EVERY_IMAGES = int(os.getenv("POPULATE_LOG_EVERY_IMAGES", "50"))
 
 
-
-if __name__ == "__main__":
+def run(days: int = 30) -> None:
     load_dotenv()
     access_token = api_helper.get_access_token(os.getenv("SKYLIGHT_USERNAME"), os.getenv("SKYLIGHT_PASSWORD"))
     fetched_event_ids = load_fetched_event_ids(FETCHED_EVENT_IDS_PATH)
@@ -36,7 +35,7 @@ if __name__ == "__main__":
         print(f"  Fetching events {offset} to {offset + limit}...")
         response = api_helper.get_recent_correlated_vessels(
             access_token,
-            30,
+            days,
             offset,
             limit=limit,
             event_types=BACKFILL_EVENT_TYPES,
@@ -49,7 +48,6 @@ if __name__ == "__main__":
 
         print(f"  Retrieved {len(records)} events (total available: {total})")
 
-        # Check if we've fetched all results
         if offset + len(records) >= total:
             break
 
@@ -84,14 +82,14 @@ if __name__ == "__main__":
 
     def backfill_vessel_events(mmsi: int, target_count: int, existing_event_ids: set) -> list:
         fetched = []
-        offset = 0
+        backfill_offset = 0
         while len(fetched) + len(vessel_images[mmsi]) < target_count:
             try:
                 response = api_helper.get_recent_correlated_events_for_vessel(
                     access_token,
                     mmsi,
                     BACKFILL_LOOKBACK_DAYS,
-                    offset=offset,
+                    offset=backfill_offset,
                     limit=limit,
                     event_types=BACKFILL_EVENT_TYPES,
                     min_estimated_length=BACKFILL_MIN_ESTIMATED_LENGTH,
@@ -115,9 +113,9 @@ if __name__ == "__main__":
                 if len(fetched) + len(vessel_images[mmsi]) >= target_count:
                     break
 
-            if offset + len(records) >= total:
+            if backfill_offset + len(records) >= total:
                 break
-            offset += limit
+            backfill_offset += limit
 
         return fetched
 
@@ -150,7 +148,7 @@ if __name__ == "__main__":
             image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
             image_response.raise_for_status()
 
-            output_path = IMAGE_DST_PATH / f"{mmsi}_{event["eventId"]}.png"
+            output_path = IMAGE_DST_PATH / f"{mmsi}_{event['eventId']}.png"
             length_m = event["eventDetails"].get("estimatedLength")
             heading = event["eventDetails"].get("heading")
 
@@ -181,6 +179,5 @@ if __name__ == "__main__":
     print(f"Vessels saved: {len(vessel_images) - filtered_count}")
     print(f"Total images saved: {saved_count}")
 
-    # Save processed event IDs
     save_event_ids(FETCHED_EVENT_IDS_PATH, downloaded_event_ids)
     print(f"\nSaved {len(downloaded_event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
