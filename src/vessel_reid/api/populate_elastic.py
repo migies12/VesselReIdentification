@@ -31,6 +31,7 @@ def run(days: int = 30) -> None:
     saved_count = 0
     failed_count = 0
     succeeded_event_ids = set()
+    pending_rows = {}
     all_downloads = [(mmsi, event) for mmsi, events_list in vessel_images.items() for event in events_list]
 
     skylight_base_url = os.getenv("IMAGE_BASE_URL", "https://cdn.sky-prod-a.skylight.earth")
@@ -59,19 +60,22 @@ def run(days: int = 30) -> None:
 
         saved_count += 1
         succeeded_event_ids.add(event['eventId'])
-
-        data_utils.upsert_row(
-            MASTER_CSV_PATH,
-            {
-                "image_path": output_path.name,
-                "boat_id": str(mmsi),
-                "length_m": "" if length_m is None else length_m,
-                "heading": "" if heading is None else heading,
-            },
-        )
+        pending_rows[output_path.name] = {
+            "image_path": output_path.name,
+            "boat_id": str(mmsi),
+            "length_m": "" if length_m is None else length_m,
+            "heading": "" if heading is None else heading,
+        }
 
         if saved_count % 1000 == 0:
+            # batch the csv writes bc downloading is getting painfully slow from csv writes and its making me mad 
+            # maybe we should in fact get a db 
+            data_utils.batch_upsert_rows(MASTER_CSV_PATH, pending_rows)
+            pending_rows = {}
             data_utils.save_event_ids(FETCHED_EVENT_IDS_PATH, succeeded_event_ids)
+
+    if pending_rows:
+        data_utils.batch_upsert_rows(MASTER_CSV_PATH, pending_rows)
 
     print(f"\n=== Summary ===")
     print(f"Total vessels: {len(vessel_images)}")

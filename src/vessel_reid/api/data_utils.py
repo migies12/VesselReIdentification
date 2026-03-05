@@ -46,6 +46,16 @@ def write_csv(csv_path: Path, rows: dict) -> None:
             writer.writerow(rows[key])
 
 
+def batch_upsert_rows(csv_path: Path, rows_to_write: dict) -> None:
+    """Merge a batch of rows into the CSV to make downloading images less fucking slow"""
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    rows = load_csv(csv_path)
+    for image_path, row in rows_to_write.items():
+        existing = rows.get(image_path, {})
+        rows[image_path] = {**existing, **row}
+    write_csv(csv_path, rows)
+
+
 def upsert_row(csv_path: Path, row: dict) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     rows = {}
