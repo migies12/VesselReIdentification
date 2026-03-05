@@ -84,23 +84,17 @@ export default function App() {
       </header>
 
       {loadingEvents && <div className="status-msg">Loading events…</div>}
-      {error && <div className="status-msg error">{error}</div>}
+      {/* {error && <div className="status-msg error">{error}</div>} */}
 
       {!loadingEvents && currentEvent && (
         <>
           <div className="main-panel">
             <div className="query-image-box">
-              {loading && <div className="image-placeholder">Running inference…</div>}
-              {!loading && result && (
-                <img
-                  src={`data:image/jpeg;base64,${result.query_image}`}
-                  alt="Satellite detection"
-                  className="query-image"
-                />
-              )}
-              {!loading && !result && !error && (
-                <div className="image-placeholder">No image</div>
-              )}
+              <img 
+                src={currentEvent.image_url}
+                alt={currentEvent.eventId}
+                className="query-image"
+              />
             </div>
 
             <div className="event-details">
