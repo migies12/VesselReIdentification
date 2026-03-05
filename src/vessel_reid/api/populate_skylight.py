@@ -148,7 +148,7 @@ def run(days: int = 30) -> None:
             image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
             image_response.raise_for_status()
 
-            output_path = IMAGE_DST_PATH / f"{mmsi}_{event['eventId']}.png"
+            output_path = IMAGE_DST_PATH / f"{mmsi}_{event['eventId']}.jpg"
             length_m = event["eventDetails"].get("estimatedLength")
             heading = event["eventDetails"].get("heading")
 
