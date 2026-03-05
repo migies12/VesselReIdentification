@@ -1,3 +1,13 @@
+"""
+TO RUN DEVELOPMENT SERVER: 
+
+From the `src/vessel_reid` folder:
+```
+export FLASK_APP=app.api
+flask run
+```
+"""
+
 import base64
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -9,15 +19,15 @@ from . import utils
 
 app = Flask(
     __name__,
-    static_folder=os.path.join(os.path.dirname(__file__), "..", "..", "..", "frontend", "dist", "assets"),
+    static_folder=os.path.join(os.path.dirname(__file__), "..", "frontend", "dist", "assets"),
     static_url_path="/assets",
 )
 CORS(app)
 
 # Global Initialization
 # Load the config
-api_dir = os.path.dirname(os.path.abspath(__file__))
-root = os.path.abspath(os.path.join(api_dir, "..", "..", ".."))
+app_dir = os.path.dirname(os.path.abspath(__file__))
+root = os.path.abspath(os.path.join(app_dir, "..", "..", ".."))
 cfg = load_config(os.path.join(root, "configs", "inference.yaml"))
 
 # Resolve relative faiss paths against the project root
@@ -30,7 +40,6 @@ model = utils.load_model(cfg, device, os.path.join(os.path.dirname(__file__), "m
 
 # In-memory event cache
 _events_cache = {}
-
 
 @app.route("/")
 def home():
@@ -52,7 +61,7 @@ def infer():
         return jsonify({"error": "No 'image' key in JSON payload"}), 400
 
     try:
-        # Apply pre-processing transformation to image
+        # Apply pre-processing transformations to image
         if ";base64," in img_b64:
             img_b64 = img_b64.split(";base64,")[-1]
         img_data = base64.b64decode(img_b64)
