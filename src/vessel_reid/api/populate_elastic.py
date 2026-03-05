@@ -50,7 +50,7 @@ def run(days: int = 30) -> None:
             continue
 
         safe_event_id = re.sub(r'[^\w\-]', '_', event['eventId'])
-        output_path = IMAGE_DST_PATH / f"{mmsi}_{safe_event_id}.png"
+        output_path = IMAGE_DST_PATH / f"{mmsi}_{safe_event_id}.jpg"
         length_m = event["eventDetails"].get("estimatedLength")
         heading = event["eventDetails"].get("heading")
 
