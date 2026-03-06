@@ -13,16 +13,11 @@ build/
 *.npz
 *.npy
 *.csv
-*.json
-!frontend/package.json
-!frontend/tsconfig.json
 runs/
 checkpoints/
 outputs/
 faiss_index/
 .env
-dataset/images/
 node_modules/
 */frontend/dist/
-dryrun*/
-data/
+*.jpg

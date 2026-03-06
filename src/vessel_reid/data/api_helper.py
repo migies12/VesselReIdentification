@@ -31,7 +31,7 @@ def get_access_token(username: str, password: str) -> str:
     token_info = data["data"]["getToken"]
     return token_info["access_token"]
 
-def get_recent_correlated_vessels(access_token: str, days: int):
+def get_recent_correlated_vessels(access_token: str, days: int, min_length: int = 150):
     """
     Fetch AIS-correlated detections from the Skylight API,
     including the image and associated metadata
@@ -98,7 +98,7 @@ def get_recent_correlated_vessels(access_token: str, days: int):
                 "startTime": {"gte": start_time.isoformat(), "lt": end_time.isoformat()},
                 "eventDetails": {
                     "detectionType": {"eq": "ais_correlated"},
-                    "detectionEstimatedLength": {"gte": 150}
+                    "detectionEstimatedLength": {"gte": min_length}
                 },
                 "limit": 2000,
                 "sortBy": "created",

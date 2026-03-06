@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from PIL import Image
 import torch
 
-from ..data.api.api_helper import get_access_token, get_recent_correlated_vessels
+from ..data.api_helper import get_access_token, get_recent_correlated_vessels
 from ..data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
 from ..models.reid_model import ReIDModel
 from ..utils.faiss_index import load_index, load_metadata, search
