@@ -17,9 +17,9 @@ import shutil
 from populate_data import MIN_IMAGES_PER_VESSEL
 
 DATASET_PATH = Path(__file__).resolve().parent / "../../../data/images"
-OUTPUT_PATH = Path(__file__).resolve().parent / "dryrun_filtered_images"
-FILTERED_PATH = Path(__file__).resolve().parent / "dryrun_deleted_images"
-EXCLUDED_PATH = Path(__file__).resolve().parent / "dryrun_excluded_vessels"
+OUTPUT_PATH = Path(__file__).resolve().parent / "../../../data/dryrun_filtered_images"
+FILTERED_PATH = Path(__file__).resolve().parent / "../../../data/dryrun_deleted_images"
+EXCLUDED_PATH = Path(__file__).resolve().parent / "../../../data/dryrun_excluded_vessels"
 
 DRY_RUN = True
 
@@ -39,21 +39,11 @@ def is_cloudy(data):
 
     return cloud_fraction > COVERAGE_THRESHOLD
 
-def is_cloudy_filepath(image_path):
-    """
-    Returns True if image at the filepath is too cloudy, else False
-    """
-    with rasterio.open(image_path) as img:
-        if img.count < 3:
-            return False
-        data = img.read([1, 2, 3])
-
-    return is_cloudy(data)
-
 def is_cloudy_bytes(image_bytes):
     """
-    Same as above, but takes image bytes instead of filename
-    For integration with the data fetching script
+    Returns True if image is too cloudy, else False
+    For integration with the data fetching script if we need it,
+    because it will allow filtering before saving the image locally
     """
     with rasterio.MemoryFile(image_bytes) as memfile:
         with memfile.open() as img:
@@ -63,7 +53,24 @@ def is_cloudy_bytes(image_bytes):
 
     return is_cloudy(data)
 
+########################## Standalone Script ##########################
+
+def is_cloudy_filepath(image_path):
+    """
+    Same as `is_cloudy_bytes`, but operates on the filepath of a downloaded image
+    For use in the below script, if cloud filtering occurs AFTER data fetch
+    """
+    with rasterio.open(image_path) as img:
+        if img.count < 3:
+            return False
+        data = img.read([1, 2, 3])
+
+    return is_cloudy(data)
+
 def setup_dryrun_folder(path):
+    """
+    Helper for the script below
+    """
     if path.exists():
         print(f"Clearing existing files in {OUTPUT_PATH}")
         shutil.rmtree(path, ignore_errors=True)
