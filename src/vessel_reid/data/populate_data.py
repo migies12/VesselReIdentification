@@ -11,8 +11,6 @@ MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
 FETCHED_EVENT_IDS_PATH = IMAGE_DST_PATH.parent / "fetched_event_ids.txt"
 MIN_IMAGES_PER_VESSEL = 3
 BACKFILL_LOOKBACK_DAYS = 540
-BACKFILL_EVENT_TYPES = ["eo_sentinel2", "eo_landsat_8_9", "sar_sentinel1"]
-BACKFILL_MIN_ESTIMATED_LENGTH = 150
 VERBOSE = os.getenv("POPULATE_VERBOSE", "0") == "1"
 LOG_EVERY_IMAGES = int(os.getenv("POPULATE_LOG_EVERY_IMAGES", "50"))
 
@@ -78,10 +76,7 @@ if __name__ == "__main__":
         response = api_helper.get_recent_correlated_vessels(
             access_token,
             30,
-            offset,
-            limit=limit,
-            event_types=BACKFILL_EVENT_TYPES,
-            min_estimated_length=BACKFILL_MIN_ESTIMATED_LENGTH,
+            offset
         )
 
         records = response["records"]
@@ -134,11 +129,9 @@ if __name__ == "__main__":
                     BACKFILL_LOOKBACK_DAYS,
                     offset=offset,
                     limit=limit,
-                    event_types=BACKFILL_EVENT_TYPES,
-                    min_estimated_length=BACKFILL_MIN_ESTIMATED_LENGTH,
                 )
             except RuntimeError as exc:
-                print(f"  Backfill failed for vessel {mmsi}: {exc}")
+                print(f"Backfill failed for vessel {mmsi}: {exc}")
                 break
 
             records = response["records"]
@@ -191,7 +184,7 @@ if __name__ == "__main__":
             image_response = requests.get(event['eventDetails']['imageUrl'], timeout=30)
             image_response.raise_for_status()
 
-            output_path = IMAGE_DST_PATH / f"{mmsi}_{event["eventId"]}.jpg"
+            output_path = IMAGE_DST_PATH / f"{mmsi}_{event['eventId']}.jpg"
             length_m = event["eventDetails"].get("estimatedLength")
 
             if not IMAGE_DST_PATH.exists():
