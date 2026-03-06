@@ -65,6 +65,17 @@ body {
   cursor: default;
 }
 
+.btn-reid {
+  background: #2b6cb0 !important;
+  border-color: #3182ce !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+.btn-reid:hover:not(:disabled) {
+  background: #3182ce !important;
+}
+
 .nav-counter {
   font-size: 0.875rem;
   color: #a0aec0;
@@ -117,7 +128,7 @@ body {
 }
 
 .image-placeholder {
-  color: #4a5568;
+  color: #718096;
   font-size: 0.875rem;
 }
 
@@ -202,7 +213,7 @@ body {
   gap: 16px;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .matches-grid {
     grid-template-columns: 1fr;
   }
@@ -226,9 +237,10 @@ body {
   overflow: hidden;
 }
 
-.match-image-box.no-image::after {
+.match-image-box.no-image::after,
+.query-image-box.no-image::after {
   content: "Image unavailable";
-  color: #4a5568;
+  color: #718096;
   font-size: 0.75rem;
 }
 

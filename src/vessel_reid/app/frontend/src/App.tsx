@@ -35,19 +35,33 @@ export default function App() {
       });
   }, []);
 
+  // On navigation, load from cache or clear previous result
   useEffect(() => {
     if (events.length === 0) return;
     const event = events[cursor];
     if (cache.current[event.event_id]) {
       setResult(cache.current[event.event_id]);
+      setError(null);
+    } else {
+      setResult(null);
+      setError(null);
+    }
+  }, [events, cursor]);
+
+  const currentEvent = events[cursor] ?? null;
+  const top3 = result?.all_results.slice(0, 3) ?? [];
+
+  function handleInfer() {
+    if (!currentEvent || loading) return;
+    if (cache.current[currentEvent.event_id]) {
+      setResult(cache.current[currentEvent.event_id]);
       return;
     }
-    setResult(null);
     setError(null);
     setLoading(true);
-    inferEvent(event.event_id)
+    inferEvent(currentEvent.event_id)
       .then((data) => {
-        cache.current[event.event_id] = data;
+        cache.current[currentEvent.event_id] = data;
         setResult(data);
         setLoading(false);
       })
@@ -55,10 +69,7 @@ export default function App() {
         setError(String(e));
         setLoading(false);
       });
-  }, [events, cursor]);
-
-  const currentEvent = events[cursor] ?? null;
-  const top3 = result?.all_results.slice(0, 3) ?? [];
+  }
 
   return (
     <div className="app">
@@ -80,6 +91,13 @@ export default function App() {
           >
             Next →
           </button>
+          <button
+            className="btn-reid"
+            onClick={handleInfer}
+            disabled={loading || !currentEvent || loadingEvents}
+          >
+            {loading ? "Running…" : "Run Re-ID"}
+          </button>
         </div>
       </header>
 
@@ -90,11 +108,19 @@ export default function App() {
         <>
           <div className="main-panel">
             <div className="query-image-box">
-              <img 
-                src={currentEvent.image_url}
-                alt={currentEvent.eventId}
-                className="query-image"
-              />
+              {currentEvent.image_url ? (
+                <img
+                  src={currentEvent.image_url}
+                  alt="Satellite detection"
+                  className="query-image"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                    e.currentTarget.parentElement!.classList.add("no-image");
+                  }}
+                />
+              ) : (
+                <div className="image-placeholder">No image available</div>
+              )}
             </div>
 
             <div className="event-details">
@@ -138,8 +164,11 @@ export default function App() {
           <div className="matches-section">
             <h2>Top Matches</h2>
             {loading && <div className="status-msg">Running inference…</div>}
-            {!loading && top3.length === 0 && !error && (
-              <div className="status-msg">No results yet</div>
+            {!loading && !result && !error && (
+              <div className="status-msg">Press "Run Re-ID" to see matches</div>
+            )}
+            {!loading && result && top3.length === 0 && (
+              <div className="status-msg">No matches found above threshold</div>
             )}
             <div className="matches-grid">
               {top3.map((match, i) => (
@@ -150,7 +179,7 @@ export default function App() {
                       alt={`Match ${i + 1}`}
                       className="match-image"
                       onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).src = "";
+                        e.currentTarget.style.display = "none";
                         e.currentTarget.parentElement!.classList.add("no-image");
                       }}
                     />

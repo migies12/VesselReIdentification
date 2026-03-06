@@ -5,9 +5,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/events": "http://localhost:5000",
-      "/infer": "http://localhost:5000",
-      "/gallery-image": "http://localhost:5000",
+      "/events": "http://localhost:5001",
+      "/infer": "http://localhost:5001",
+      "/gallery-image": "http://localhost:5001",
     },
   },
 });
