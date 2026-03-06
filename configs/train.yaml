@@ -1,9 +1,9 @@
 seed: 1337
 
 data:
-  train_csv: data/train.csv
-  val_csv: data/val.csv
-  image_root: data/images
+  train_csv: dataset/train.csv
+  val_csv: dataset/val.csv
+  image_root: dataset/images
   image_size: 224
   num_workers: 8
   batch_size: 128
