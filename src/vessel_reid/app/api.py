@@ -101,9 +101,7 @@ def infer(event_id):
             fetched_event = utils.get_event_by_id(result_event_id)
 
             result["image_url"] = fetched_event["eventDetails"]["imageUrl"] if fetched_event else None
-
-            if "boat_id" in result and hasattr(result["boat_id"], "item"):
-                result["boat_id"] = result["boat_id"].item()
+            result["boat_id"] = result["image_path"].split("_", 1)[0]
 
             top_k_results_with_image_url.append(result)
 
