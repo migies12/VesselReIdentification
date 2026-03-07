@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchEvents, inferEvent } from "./api";
-import type { VesselEvent, InferenceResult } from "./types";
-import "./index.css";
+import { fetchEvents, inferEvent } from "./utils/api";
+import { type VesselEvent, type InferenceResult, type GalleryMatch } from "./utils/types";
+import "./styles/index.css";
+import MatchModal from "./components/MatchModal";
 
 function formatTime(iso: string | null): string {
   if (!iso) return "—";
@@ -20,6 +21,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<GalleryMatch | null>(null);
 
   const cache = useRef<Record<string, InferenceResult>>({});
 
@@ -49,7 +51,7 @@ export default function App() {
   }, [events, cursor]);
 
   const currentEvent = events[cursor] ?? null;
-  const top3 = result?.all_results.slice(0, 3) ?? [];
+  const top3 = result?.all_results?.slice(0, 3) ?? [];
 
   function handleInfer() {
     if (!currentEvent || loading) return;
@@ -171,7 +173,11 @@ export default function App() {
             )}
             <div className="matches-grid">
               {top3.map((match, i) => (
-                <div key={i} className="match-card">
+                <div 
+                  key={i} 
+                  className="match-card"
+                  onClick={() => setSelectedMatch(match)}
+                >
                   <div className="match-image-box">
                     <img
                       src={match.image_url}
@@ -196,6 +202,11 @@ export default function App() {
           </div>
         </>
       )}
+
+      <MatchModal
+        match={selectedMatch}
+        onClose={() => setSelectedMatch(null)}
+      />
     </div>
   );
 }
