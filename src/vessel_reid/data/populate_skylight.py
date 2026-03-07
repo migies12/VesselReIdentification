@@ -16,6 +16,11 @@ import data_utils
 IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
 MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
 FETCHED_EVENT_IDS_PATH = IMAGE_DST_PATH.parent / "fetched_event_ids.txt"
+<<<<<<< HEAD:src/vessel_reid/data/populate_skylight.py
+=======
+MIN_IMAGES_PER_VESSEL = 3
+BACKFILL_LOOKBACK_DAYS = 540
+>>>>>>> origin/main:src/vessel_reid/data/populate_data.py
 VERBOSE = os.getenv("POPULATE_VERBOSE", "0") == "1"
 LOG_EVERY_IMAGES = int(os.getenv("POPULATE_LOG_EVERY_IMAGES", "50"))
 
@@ -35,11 +40,16 @@ def run(days: int = 30) -> None:
         print(f"  Fetching events {offset} to {offset + limit}...")
         response = api_helper.get_recent_correlated_vessels(
             access_token,
+<<<<<<< HEAD:src/vessel_reid/data/populate_skylight.py
             days,
             offset,
             limit=limit,
             event_types=BACKFILL_EVENT_TYPES,
             min_estimated_length=BACKFILL_MIN_ESTIMATED_LENGTH,
+=======
+            30,
+            offset
+>>>>>>> origin/main:src/vessel_reid/data/populate_data.py
         )
 
         records = response["records"]
@@ -91,11 +101,9 @@ def run(days: int = 30) -> None:
                     BACKFILL_LOOKBACK_DAYS,
                     offset=backfill_offset,
                     limit=limit,
-                    event_types=BACKFILL_EVENT_TYPES,
-                    min_estimated_length=BACKFILL_MIN_ESTIMATED_LENGTH,
                 )
             except RuntimeError as exc:
-                print(f"  Backfill failed for vessel {mmsi}: {exc}")
+                print(f"Backfill failed for vessel {mmsi}: {exc}")
                 break
 
             records = response["records"]

@@ -13,12 +13,11 @@ build/
 *.npz
 *.npy
 *.csv
-*.json
 runs/
 checkpoints/
 outputs/
 faiss_index/
 .env
-data/
-dryrun*/
-
+node_modules/
+*/frontend/dist/
+*.jpg
