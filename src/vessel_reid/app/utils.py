@@ -1,16 +1,17 @@
 import base64
-import io
-import os
-
-import numpy as np
-import requests
+from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
+import io
+import numpy as np
+import os
 from PIL import Image
+import requests
 import torch
 
 from ..data.api_helper import get_access_token, get_event, get_recent_correlated_vessels
 from ..data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
 from ..data.filter_clouds import is_cloudy_bytes
+from . import db
 from ..models.reid_model import ReIDModel
 from ..utils.faiss_index import load_index, load_metadata, search
 
@@ -91,20 +92,41 @@ def fetch_skylight_events(days=7):
     Uses the same length >= 150m constraint as the training data pipeline
     Also filters out events with cloudy
     """
-    response = get_recent_correlated_vessels(ACCESS_TOKEN, days)
+    # Create cloudy_cache table in case it doesn't already exist (if it does, this won't do anything)
+    db.init_cloudy_table()
 
-    events = []
-    for record in response["records"]:
-        details = record.get("eventDetails", {})
-        img_data, _ = download_image(details.get("imageUrl"))
-        if is_cloudy_bytes(img_data):
-            continue
+    response = get_recent_correlated_vessels(ACCESS_TOKEN, days)
+    records = response["records"]
+
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        results = list(executor.map(process_event_helper, records))
+
+    return [event for event in results if event is not None]
+
+def process_event_helper(record):
+    """
+    Helper function to run in parallel when fetching Skylight events
+
+    Checks database to see if cloudiness of image is known, otherwise checks it and stores result
+    """
+    try:
+        event_id = record["eventId"]
+        cached_status = db.get_cached_cloudy_status(event_id)
+        if cached_status is True:
+            return None
+        elif not cached_status:
+            details = record.get("eventDetails", {})
+            img_data, _ = download_image(details.get("imageUrl"))
+            is_cloudy = is_cloudy_bytes(img_data)
+            db.cache_cloudy_status(event_id, is_cloudy)
+            if is_cloudy:
+                return None
 
         vessel_info = record.get("vessels", {}).get("vessel0", {})
         start = record.get("start", {})
         point = start.get("point", {})
 
-        events.append({
+        return {
             "event_id": record["eventId"],
             "event_type": record.get("eventType"),
             "mmsi": vessel_info.get("mmsi"),
@@ -118,9 +140,9 @@ def fetch_skylight_events(days=7):
             "lat": point.get("lat"),
             "lon": point.get("lon"),
             "time": start.get("time"),
-        })
-
-    return events
+        }
+    except Exception as e:
+        return None
 
 def get_event_by_id(event_id):
     return get_event(ACCESS_TOKEN, event_id)

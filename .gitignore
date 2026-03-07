@@ -21,3 +21,5 @@ faiss_index/
 node_modules/
 */frontend/dist/
 *.jpg
+*.db
+
