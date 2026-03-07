@@ -4,7 +4,7 @@ TO RUN DEVELOPMENT SERVER:
 From the `src/vessel_reid` folder:
 ```
 export FLASK_APP=app.api
-flask run
+flask run --port 5001
 ```
 """
 
@@ -48,38 +48,6 @@ def home():
     if os.path.exists(index_path):
         return send_from_directory(os.path.join(root, "frontend", "dist"), "index.html")
     return "<h2>Vessel Reidentification API</h2>"
-
-
-@app.route("/infer", methods=["POST"])
-def infer():
-    if not request.is_json:
-        return jsonify({"error": "Payload must be JSON"}), 400
-
-    data = request.get_json()
-    img_b64 = data.get("image")
-    if not img_b64:
-        return jsonify({"error": "No 'image' key in JSON payload"}), 400
-
-    try:
-        # Apply pre-processing transformations to image
-        if ";base64," in img_b64:
-            img_b64 = img_b64.split(";base64,")[-1]
-        img_data = base64.b64decode(img_b64)
-
-        heading = data.get("heading")
-        length = data.get("length")
-        transformed_img = utils.transform_image(cfg, img_data, heading, device)
-
-        # Generate embedding
-        embedding = utils.generate_embedding(cfg, transformed_img, length, model, device)
-
-        # Similarity search
-        top_k_results = utils.similarity_search(cfg, embedding)
-        return jsonify(top_k_results), 200
-
-    except Exception as e:
-        return jsonify({"error": f"Processing failed: {str(e)}"}), 500
-
 
 @app.route("/events", methods=["GET"])
 def get_events():

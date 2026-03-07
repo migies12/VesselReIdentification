@@ -83,10 +83,12 @@ def similarity_search(cfg, embedding):
 
 
 def fetch_skylight_events(days=7):
-    """Fetch recent Sentinel-2 vessel detection events from Skylight API.
+    """
+    Fetch recent Sentinel-2 vessel detection events from Skylight API
 
-    Returns a list of event dicts with fields needed by the frontend.
-    Uses the same length >= 150m constraint as the training data pipeline.
+    Returns a list of events with fields needed by the frontend
+    Uses the same length >= 150m constraint as the training data pipeline
+    Also filters out events with cloudy
     """
     username = os.getenv("SKYLIGHT_USERNAME")
     password = os.getenv("SKYLIGHT_PASSWORD")

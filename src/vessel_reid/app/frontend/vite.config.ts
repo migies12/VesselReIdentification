@@ -6,7 +6,6 @@ export default defineConfig({
   server: {
     proxy: {
       "/events": "http://localhost:5001",
-      "/infer": "http://localhost:5001",
       "/gallery-image": "http://localhost:5001",
     },
   },

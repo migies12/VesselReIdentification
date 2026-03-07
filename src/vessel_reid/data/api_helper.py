@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import os
 import requests
+from typing import List, Optional
 
 def get_access_token(username: str, password: str) -> str:
     """
@@ -140,3 +141,171 @@ def get_recent_correlated_vessels(access_token: str, days: int, min_length: int 
             "total": total_count
         }
     }
+
+def get_recent_correlated_events_for_vessel(
+    access_token: str,
+    mmsi: int,
+    days: int,
+    offset: int = 0,
+    limit: int = 1000,
+    event_types: Optional[List[str]] = None,
+    min_estimated_length: Optional[float] = 150,
+):
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    query = """
+        query SearchEventsV2($input: SearchEventsV2Input!) {
+            searchEventsV2(input: $input) {
+                records {
+                    eventId
+                    eventType
+                    start {
+                        time
+                        point { lat lon }
+                    }
+                    end {
+                        time
+                        point { lat lon }
+                    }
+                    vessels {
+                        vessel0 {
+                            mmsi
+                            name
+                            countryCode
+                        }
+                    }
+                    eventDetails {
+                        ... on ImageryMetadataEventDetails {
+                            detectionType
+                            score
+                            estimatedLength
+                            frameIds
+                            imageUrl
+                            orientation
+                        }
+                        ... on ViirsEventDetails {
+                            detectionType
+                            estimatedLength
+                            frameIds
+                            imageUrl
+                        }
+                    }
+                }
+                meta {
+                    total
+                }
+            }
+        }
+    """
+
+    if event_types is None:
+        event_types = ["eo_sentinel2"]
+
+    event_details = {"detectionType": {"eq": "ais_correlated"}}
+    if min_estimated_length is not None:
+        event_details["detectionEstimatedLength"] = {"gte": min_estimated_length}
+
+    variables = {
+        "input": {
+            "eventType": {"inc": event_types},
+            "startTime": {"gte": since.isoformat()},
+            "eventDetails": event_details,
+            "vesselMain": {"mmsi": {"eq": str(mmsi)}},
+            "limit": limit,
+            "offset": offset,
+            "sortBy": "created",
+            "sortDirection": "desc",
+        }
+    }
+
+    response = requests.post(
+        os.getenv("GRAPHQL_URL"),
+        json={
+            "query": query,
+            "variables": variables
+        },
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+
+    data = response.json()
+    if "errors" in data:
+        print(f"DEBUG - HTTP Status Code: {response.status_code}")
+        print(f"DEBUG - API Error Response: {data}")
+        if data.get("data", {}).get("searchEventsV2") is None:
+            return {"records": [], "meta": {"total": 0}}
+        raise RuntimeError(data["errors"])
+
+    return data["data"]["searchEventsV2"]
+
+def get_event(access_token: str, event_id: str):
+    """
+    Fetch a specific event by ID
+    """
+    query = """
+        query SearchEventsV2($input: SearchEventsV2Input!) {
+            searchEventsV2(input: $input) {
+                records {
+                    eventId
+                    eventType
+                    start {
+                        time
+                        point { lat lon }
+                    }
+                    end {
+                        time
+                        point { lat lon }
+                    }
+                    vessels {
+                        vessel0 {
+                            mmsi
+                            name
+                            vesselType
+                            countryCode
+                        }
+                    }
+                    eventDetails {
+                        ... on ImageryMetadataEventDetails {
+                            detectionType
+                            score
+                            estimatedLength
+                            frameIds
+                            imageUrl
+                            orientation
+                        }
+                    }
+                }
+                meta {
+                    total
+                }
+            }
+        }
+    """
+
+    variables = {
+        "input": {
+            "eventType": {"inc": ["eo_sentinel2"]},
+            "eventId": {"eq": event_id}
+        }
+    }
+
+    response = requests.post(
+            os.getenv("GRAPHQL_URL"),
+            json={
+                "query": query,
+                "variables": variables
+            },
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            },
+            timeout=30,
+        )
+    response.raise_for_status()
+    response = response.json()
+    records = response["data"]["searchEventsV2"]["records"]
+    return records[0] if records else None
