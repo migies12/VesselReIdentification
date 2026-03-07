@@ -7,7 +7,7 @@ export interface VesselEvent {
   country_code: string | null;
   image_url: string | null;
   estimated_length: number | null;
-  orientation: number | null;
+  heading: number | null;
   detection_score: number | null;
   lat: number | null;
   lon: number | null;

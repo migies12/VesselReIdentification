@@ -167,7 +167,7 @@ if __name__ == "__main__":
                 vessel_images[mmsi].extend(backfilled)
                 events_list = vessel_images[mmsi]
                 if VERBOSE:
-                    print(f"  Added {len(backfilled)} images from backfill (total now {len(events_list)})")
+                    print(f"Added {len(backfilled)} images from backfill (total now {len(events_list)})")
 
         if len(events_list) < MIN_IMAGES_PER_VESSEL:
             if VERBOSE:

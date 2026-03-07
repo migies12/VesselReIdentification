@@ -87,7 +87,7 @@ def infer(event_id):
         event = _events_cache[event_id]
         img_data, img_b64 = utils.download_image(event["image_url"])
 
-        heading = event.get("orientation")
+        heading = event.get("heading")
         length = event.get("estimated_length")
 
         transformed_img = utils.transform_image(cfg, img_data, heading, device)

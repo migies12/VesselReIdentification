@@ -135,7 +135,7 @@ export default function App() {
                   </tr>
                   <tr>
                     <th>Heading</th>
-                    <td>{currentEvent.orientation != null ? `${currentEvent.orientation}°` : "—"}</td>
+                    <td>{currentEvent.heading != null ? `${currentEvent.heading}°` : "—"}</td>
                   </tr>
                   <tr>
                     <th>Detection Score</th>

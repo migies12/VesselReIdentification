@@ -109,7 +109,7 @@ def fetch_skylight_events(days=7):
             "country_code": vessel_info.get("countryCode"),
             "image_url": details.get("imageUrl"),
             "estimated_length": details.get("estimatedLength"),
-            "orientation": details.get("orientation"),
+            "heading": details.get("heading"),
             "detection_score": details.get("score"),
             "lat": point.get("lat"),
             "lon": point.get("lon"),
