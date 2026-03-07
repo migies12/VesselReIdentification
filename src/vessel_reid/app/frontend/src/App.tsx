@@ -205,6 +205,7 @@ export default function App() {
 
       <MatchModal
         match={selectedMatch}
+        event={currentEvent}
         onClose={() => setSelectedMatch(null)}
       />
     </div>
