@@ -8,7 +8,6 @@ flask run --port 5001
 ```
 """
 
-import base64
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import os
@@ -27,12 +26,13 @@ CORS(app)
 # Global Initialization
 # Load the config
 app_dir = os.path.dirname(os.path.abspath(__file__))
-root = os.path.abspath(os.path.join(app_dir, "..", "..", ".."))
-cfg = load_config(os.path.join(root, "configs", "inference.yaml"))
+src_root = os.path.abspath(os.path.join(app_dir, ".."))
+project_root = os.path.abspath(os.path.join(src_root, "..", ".."))
+cfg = load_config(os.path.join(project_root, "configs", "inference.yaml"))
 
 # Resolve relative faiss paths against the project root
-cfg["faiss"]["index_path"] = os.path.join(root, cfg["faiss"]["index_path"])
-cfg["faiss"]["metadata_path"] = os.path.join(root, cfg["faiss"]["metadata_path"])
+cfg["faiss"]["index_path"] = os.path.join(src_root, cfg["faiss"]["index_path"])
+cfg["faiss"]["metadata_path"] = os.path.join(src_root, cfg["faiss"]["metadata_path"])
 
 # Load the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -44,9 +44,9 @@ _events_cache = {}
 @app.route("/")
 def home():
     # Serve React app if built, otherwise show API status
-    index_path = os.path.join(root, "frontend", "dist", "index.html")
+    index_path = os.path.join(app_dir, "frontend", "dist", "index.html")
     if os.path.exists(index_path):
-        return send_from_directory(os.path.join(root, "frontend", "dist"), "index.html")
+        return send_from_directory(os.path.join(app_dir, "frontend", "dist"), "index.html")
     return "<h2>Vessel Reidentification API</h2>"
 
 @app.route("/events", methods=["GET"])
@@ -59,7 +59,7 @@ def get_events():
         if _events_cache and not force_refresh:
             return jsonify(list(_events_cache.values())), 200
 
-        events = utils.fetch_skylight_events(days=7)
+        events = utils.fetch_skylight_events(days=1)
 
         _events_cache = {}
         for event in events:
@@ -69,17 +69,16 @@ def get_events():
 
     except Exception as e:
         return jsonify({"error": f"Failed to fetch events: {str(e)}"}), 500
-
-
-@app.route("/gallery-image/<path:image_path>")
-def gallery_image(image_path):
-    """Serve a gallery image from the dataset images directory."""
-    image_root = os.path.join(root, "dataset", "images")
-    return send_from_directory(image_root, image_path)
-
+    
+@app.route("/events/<event_id>/", methods=["GET"])
+def event(event_id):
+    """
+    Fetch a specific event from Skylight by event id
+    """
+    return utils.get_event(event_id)
 
 @app.route("/events/<event_id>/infer", methods=["POST"])
-def infer_event(event_id):
+def infer(event_id):
     """Download the image for a cached event and run inference on it."""
     if event_id not in _events_cache:
         return jsonify({"error": "Event not found. Fetch /events first."}), 404
@@ -95,11 +94,25 @@ def infer_event(event_id):
         embedding = utils.generate_embedding(cfg, transformed_img, length, model, device)
         top_k_results = utils.similarity_search(cfg, embedding)
 
+        top_k_results_with_image_url = []
+        for result in top_k_results["all_results"]:
+            result_event_id_parts = result["image_path"].split("_", 1)[1].rsplit(".", 1)[0].rsplit("_", 2)
+            result_event_id = f"{result_event_id_parts[0]}.{result_event_id_parts[1]}_{result_event_id_parts[2]}"
+            fetched_event = utils.get_event_by_id(result_event_id)
+
+            result["image_url"] = fetched_event["eventDetails"]["imageUrl"] if fetched_event else None
+
+            if "boat_id" in result and hasattr(result["boat_id"], "item"):
+                result["boat_id"] = result["boat_id"].item()
+
+            top_k_results_with_image_url.append(result)
+
         return jsonify({
             "event": event,
             "query_image": img_b64,
-            **top_k_results,
+            "all_results": top_k_results_with_image_url,
         }), 200
 
     except Exception as e:
+        app.logger.error(f"Inference failed for event {event_id}: {str(e)}")
         return jsonify({"error": f"Inference failed: {str(e)}"}), 500

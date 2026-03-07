@@ -8,12 +8,17 @@ from dotenv import load_dotenv
 from PIL import Image
 import torch
 
-from ..data.api_helper import get_access_token, get_recent_correlated_vessels
+from ..data.api_helper import get_access_token, get_event, get_recent_correlated_vessels
 from ..data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
 from ..models.reid_model import ReIDModel
 from ..utils.faiss_index import load_index, load_metadata, search
 
 load_dotenv()
+USERNAME = os.getenv("SKYLIGHT_USERNAME")
+PASSWORD = os.getenv("SKYLIGHT_PASSWORD")
+if not USERNAME or not PASSWORD:
+    raise RuntimeError("SKYLIGHT_USERNAME and SKYLIGHT_PASSWORD must be set in .env")
+ACCESS_TOKEN = get_access_token(USERNAME, PASSWORD)
 
 
 def load_model(cfg, device, model_path):
@@ -29,7 +34,6 @@ def load_model(cfg, device, model_path):
     model.eval()
     return model
 
-
 def transform_image(cfg, img, heading, device):
     transform = build_eval_transforms(cfg["query"]["image_size"])
     image = Image.open(io.BytesIO(img)).convert("RGB")
@@ -38,7 +42,6 @@ def transform_image(cfg, img, heading, device):
         image = rotate_and_crop_by_heading(image, heading)
     image = apply_transforms(image, transform).unsqueeze(0).to(device)
     return image
-
 
 def generate_embedding(cfg, image, length_m, model, device):
     length_tensor = None
@@ -52,7 +55,6 @@ def generate_embedding(cfg, image, length_m, model, device):
         embedding = model(image, length_tensor).cpu().numpy().astype(np.float32)
 
     return embedding
-
 
 def similarity_search(cfg, embedding):
     index = load_index(cfg["faiss"]["index_path"])
@@ -81,7 +83,6 @@ def similarity_search(cfg, embedding):
         "all_results": results,
     }
 
-
 def fetch_skylight_events(days=7):
     """
     Fetch recent Sentinel-2 vessel detection events from Skylight API
@@ -90,13 +91,7 @@ def fetch_skylight_events(days=7):
     Uses the same length >= 150m constraint as the training data pipeline
     Also filters out events with cloudy
     """
-    username = os.getenv("SKYLIGHT_USERNAME")
-    password = os.getenv("SKYLIGHT_PASSWORD")
-    if not username or not password:
-        raise RuntimeError("SKYLIGHT_USERNAME and SKYLIGHT_PASSWORD must be set in .env")
-
-    access_token = get_access_token(username, password)
-    response = get_recent_correlated_vessels(access_token, days)
+    response = get_recent_correlated_vessels(ACCESS_TOKEN, days)
 
     events = []
     for record in response["records"]:
@@ -123,6 +118,8 @@ def fetch_skylight_events(days=7):
 
     return events
 
+def get_event_by_id(event_id):
+    return get_event(ACCESS_TOKEN, event_id)
 
 def download_image(image_url):
     """Download an image from a URL and return (raw_bytes, base64_string)."""

@@ -18,6 +18,7 @@ export interface GalleryMatch {
   score: number;
   boat_id: string;
   image_path: string;
+  image_url: string;
   length_m: number | null;
 }
 

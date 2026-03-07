@@ -102,8 +102,6 @@ export default function App() {
       </header>
 
       {loadingEvents && <div className="status-msg">Loading events…</div>}
-      {/* {error && <div className="status-msg error">{error}</div>} */}
-
       {!loadingEvents && currentEvent && (
         <>
           <div className="main-panel">
@@ -148,14 +146,14 @@ export default function App() {
                     <th>Location</th>
                     <td>{formatCoord(currentEvent.lat)}, {formatCoord(currentEvent.lon)}</td>
                   </tr>
-                  {result && (
+                  {/* {result && (
                     <tr>
                       <th>Re-ID</th>
                       <td className={result.matched ? "tag-match" : "tag-no-match"}>
                         {result.matched ? "Match found" : "No match"}
                       </td>
                     </tr>
-                  )}
+                  )} */}
                 </tbody>
               </table>
             </div>
@@ -164,6 +162,7 @@ export default function App() {
           <div className="matches-section">
             <h2>Top Matches</h2>
             {loading && <div className="status-msg">Running inference…</div>}
+            {error && <div className="status-msg error">{error}</div>}
             {!loading && !result && !error && (
               <div className="status-msg">Press "Run Re-ID" to see matches</div>
             )}
@@ -175,7 +174,7 @@ export default function App() {
                 <div key={i} className="match-card">
                   <div className="match-image-box">
                     <img
-                      src={`/gallery-image/${match.image_path}`}
+                      src={match.image_url}
                       alt={`Match ${i + 1}`}
                       className="match-image"
                       onError={(e) => {
