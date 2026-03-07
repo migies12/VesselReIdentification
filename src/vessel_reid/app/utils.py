@@ -98,10 +98,23 @@ def fetch_skylight_events(days=7):
     response = get_recent_correlated_vessels(ACCESS_TOKEN, days)
     records = response["records"]
 
-    with ThreadPoolExecutor(max_workers=20) as executor:
-        results = list(executor.map(process_event_helper, records))
+    new_events = []
+    cached_events = []
 
-    return [event for event in results if event is not None]
+    for record in records:
+        status = db.get_cached_cloudy_status(record["eventId"])
+        if status is False:
+            cached_events.append(record)
+        elif status is None:
+            new_events.append(record)
+
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        new_results = list(executor.map(process_event_helper, new_events))
+
+    cached_events = [format_event_helper(event) for event in cached_events]
+    new_events = [event for event in new_results if event is not None]
+
+    return cached_events + new_events
 
 def process_event_helper(record):
     """
@@ -121,13 +134,20 @@ def process_event_helper(record):
             db.cache_cloudy_status(event_id, is_cloudy)
             if is_cloudy:
                 return None
+            
+        return format_event_helper(record)
+    
+    except Exception as e:
+        return None
+    
+def format_event_helper(record):
+    details = record.get("eventDetails", {})
+    vessel_info = record.get("vessels", {}).get("vessel0", {})
+    start = record.get("start", {})
+    point = start.get("point", {})
 
-        vessel_info = record.get("vessels", {}).get("vessel0", {})
-        start = record.get("start", {})
-        point = start.get("point", {})
-
-        return {
-            "event_id": record["eventId"],
+    return {
+        "event_id": record["eventId"],
             "event_type": record.get("eventType"),
             "mmsi": vessel_info.get("mmsi"),
             "vessel_name": vessel_info.get("name"),
@@ -140,9 +160,7 @@ def process_event_helper(record):
             "lat": point.get("lat"),
             "lon": point.get("lon"),
             "time": start.get("time"),
-        }
-    except Exception as e:
-        return None
+    }
 
 def get_event_by_id(event_id):
     return get_event(ACCESS_TOKEN, event_id)

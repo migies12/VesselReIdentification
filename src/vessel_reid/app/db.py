@@ -7,6 +7,10 @@ def get_db_connection():
 
 def init_cloudy_table():
     with get_db_connection() as conn:
+        # Optimizations to increase write speeds
+        conn.execute("PRAGMA jounral_mode=WAL;")
+        conn.execute("PRAGMA sybnchronous=OFF;")
+        
         conn.execute("""
             CREATE TABLE IF NOT EXISTS cloudy_cache (
                 event_id TEXT PRIMARY KEY,
