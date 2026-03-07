@@ -1,10 +1,11 @@
-import api_helper
 from collections import defaultdict
 import csv
 from dotenv import load_dotenv
 import os
 from pathlib import Path
 import requests
+
+from . import api_helper
 
 IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
 MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"

@@ -14,7 +14,7 @@ from pathlib import Path
 from collections import defaultdict
 import shutil
 
-from populate_data import MIN_IMAGES_PER_VESSEL
+from .populate_data import MIN_IMAGES_PER_VESSEL
 
 DATASET_PATH = Path(__file__).resolve().parent / "../../../data/images"
 OUTPUT_PATH = Path(__file__).resolve().parent / "../../../data/dryrun_filtered_images"

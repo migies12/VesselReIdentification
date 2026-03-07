@@ -10,6 +10,7 @@ import torch
 
 from ..data.api_helper import get_access_token, get_event, get_recent_correlated_vessels
 from ..data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
+from ..data.filter_clouds import is_cloudy_bytes
 from ..models.reid_model import ReIDModel
 from ..utils.faiss_index import load_index, load_metadata, search
 
@@ -19,7 +20,6 @@ PASSWORD = os.getenv("SKYLIGHT_PASSWORD")
 if not USERNAME or not PASSWORD:
     raise RuntimeError("SKYLIGHT_USERNAME and SKYLIGHT_PASSWORD must be set in .env")
 ACCESS_TOKEN = get_access_token(USERNAME, PASSWORD)
-
 
 def load_model(cfg, device, model_path):
     model = ReIDModel(
@@ -96,6 +96,10 @@ def fetch_skylight_events(days=7):
     events = []
     for record in response["records"]:
         details = record.get("eventDetails", {})
+        img_data, _ = download_image(details.get("imageUrl"))
+        if is_cloudy_bytes(img_data):
+            continue
+
         vessel_info = record.get("vessels", {}).get("vessel0", {})
         start = record.get("start", {})
         point = start.get("point", {})
