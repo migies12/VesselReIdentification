@@ -1,3 +1,12 @@
+"""
+This file contains both a standalone script for filtering out the cloudy images from an existing dataset,
+and a helper function for filtering out cloudy images when fetching them from the API (`is_cloudy_bytes`)
+
+Both methods rely on the same criteria for classifying an image as "cloudy", contained in the `is_cloudy` function
+This function uses thresholds for brightness and saturation that can be adjusted. I found their current values through
+trial and error and manual inspection, and the results are moderately successful
+"""
+
 from collections import defaultdict
 import os
 from pathlib import Path
@@ -63,18 +72,28 @@ def get_cloud_coverage(image_path, csv_path, rows=None):
     return coverage
 
 
-def is_cloudy_filepath(image_path, csv_path):
+########################## Standalone Script ##########################
+
+def is_cloudy_filepath(image_path, csv_path=None):
     """
-    Returns True if image at the filepath is too cloudy, else False.
-    Uses cached cloud coverage from csv_path if available.
+    Same as `is_cloudy_bytes`, but operates on the filepath of a downloaded image.
+    For use in the below script, if cloud filtering occurs AFTER data fetch.
+    If csv_path is provided, uses cached cloud coverage from the CSV if available.
     """
-    return get_cloud_coverage(image_path, csv_path) > COVERAGE_THRESHOLD
+    if csv_path is not None:
+        return get_cloud_coverage(image_path, csv_path) > COVERAGE_THRESHOLD
+    with rasterio.open(image_path) as img:
+        if img.count < 3:
+            return True
+        data = img.read([1, 2, 3]).astype(float)
+    return is_cloudy(data)
 
 
 def is_cloudy_bytes(image_bytes):
     """
-    Same as above, but takes image bytes instead of filename
-    For integration with the data fetching script
+    Returns True if image is too cloudy, else False.
+    For integration with the data fetching script if we need it,
+    because it will allow filtering before saving the image locally.
     """
     with rasterio.MemoryFile(image_bytes) as memfile:
         with memfile.open() as img:
@@ -86,6 +105,9 @@ def is_cloudy_bytes(image_bytes):
 
 
 def setup_dryrun_folder(path):
+    """
+    Helper for the script below
+    """
     if path.exists():
         print(f"Clearing existing files in {OUTPUT_PATH}")
         shutil.rmtree(path, ignore_errors=True)
