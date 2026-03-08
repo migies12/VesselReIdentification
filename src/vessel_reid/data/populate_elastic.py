@@ -3,7 +3,6 @@ from collections import defaultdict
 from dotenv import load_dotenv
 import os
 from pathlib import Path
-import re
 import requests
 from tqdm import tqdm
 
@@ -50,8 +49,7 @@ def run(days: int = 30) -> None:
             tqdm.write(f"  Failed to download {image_url}: {e}")
             continue
 
-        safe_event_id = re.sub(r'[^\w\-]', '_', event['eventId'])
-        output_path = IMAGE_DST_PATH / f"{mmsi}_{safe_event_id}.jpg"
+        output_path = IMAGE_DST_PATH / f"{mmsi}_{event['eventId']}.png"
         length_m = event["eventDetails"].get("estimatedLength")
         heading = event["eventDetails"].get("heading")
 
