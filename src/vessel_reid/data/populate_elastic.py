@@ -2,15 +2,14 @@ import api_helper_elastic
 from collections import defaultdict
 from dotenv import load_dotenv
 import os
-from pathlib import Path
 import requests
 from tqdm import tqdm
 
 import data_utils
+from vessel_reid.paths import RAW_IMAGES_DIR, RAW_METADATA_CSV, FETCHED_EVENT_IDS_PATH
 
-IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
-MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
-FETCHED_EVENT_IDS_PATH = IMAGE_DST_PATH.parent / "fetched_event_ids.txt"
+IMAGE_DST_PATH  = RAW_IMAGES_DIR
+MASTER_CSV_PATH = RAW_METADATA_CSV
 
 
 def run(days: int = 30) -> None:

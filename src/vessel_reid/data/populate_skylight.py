@@ -2,7 +2,6 @@ import api_helper_skylight as api_helper
 from collections import defaultdict
 from dotenv import load_dotenv
 import os
-from pathlib import Path
 import requests
 
 from config import (
@@ -12,10 +11,10 @@ from config import (
     BACKFILL_MIN_ESTIMATED_LENGTH,
 )
 import data_utils
+from vessel_reid.paths import RAW_IMAGES_DIR, RAW_METADATA_CSV, FETCHED_EVENT_IDS_PATH
 
-IMAGE_DST_PATH = Path(__file__).resolve().parent / "../../../data/images"
-MASTER_CSV_PATH = IMAGE_DST_PATH.parent / "all_labels.csv"
-FETCHED_EVENT_IDS_PATH = IMAGE_DST_PATH.parent / "fetched_event_ids.txt"
+IMAGE_DST_PATH  = RAW_IMAGES_DIR
+MASTER_CSV_PATH = RAW_METADATA_CSV
 VERBOSE = os.getenv("POPULATE_VERBOSE", "0") == "1"
 LOG_EVERY_IMAGES = int(os.getenv("POPULATE_LOG_EVERY_IMAGES", "50"))
 

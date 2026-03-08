@@ -16,6 +16,13 @@ import numpy as np
 import rasterio
 
 import data_utils
+from vessel_reid.paths import (
+    RAW_IMAGES_DIR      as DATASET_PATH,
+    RAW_METADATA_CSV    as MASTER_CSV_PATH,
+    FILTERED_IMAGES_DIR as OUTPUT_PATH,
+    CLOUDY_EXCLUDED_DIR as FILTERED_PATH,
+    VESSEL_EXCLUDED_DIR as EXCLUDED_PATH,
+)
 
 from config import (
     MIN_IMAGES_PER_VESSEL,
@@ -28,11 +35,6 @@ from config import (
     LUMINANCE_B,
 )
 
-DATASET_PATH = Path(__file__).resolve().parent / "../../../data/images"
-MASTER_CSV_PATH = DATASET_PATH.parent / "all_labels.csv"
-OUTPUT_PATH = DATASET_PATH.parent / "dryrun_filtered_images"
-FILTERED_PATH = DATASET_PATH.parent / "dryrun_deleted_images"
-EXCLUDED_PATH = DATASET_PATH.parent / "dryrun_excluded_vessels"
 
 def compute_cloud_coverage(data):
     """Returns the fraction of pixels identified as cloud."""
