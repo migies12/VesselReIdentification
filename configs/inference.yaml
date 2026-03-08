@@ -1,13 +1,10 @@
 model:
-  checkpoint: outputs/reid_model.pt
   backbone: resnet50
   embedding_dim: 512
   use_length: true
   length_embed_dim: 32
 
 faiss:
-  index_path: faiss_index/gallery.index
-  metadata_path: faiss_index/gallery_metadata.json
   normalize: true
 
 query:

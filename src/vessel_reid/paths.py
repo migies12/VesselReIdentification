@@ -48,6 +48,7 @@ FAISS_INDEX_PATH    = MODEL_DIR / "gallery.index"
 FAISS_METADATA_PATH = MODEL_DIR / "gallery_metadata.json"
 TRAIN_STATS_CSV     = MODEL_DIR / "train_stats.csv"
 TRAIN_STATS_JSON    = MODEL_DIR / "train_stats.json"
+LOSS_CURVE_PNG      = MODEL_DIR / "loss_curve.png"
 
 # ---------------------------------------------------------------------------
 # statistics: visualizations to tell if our model is doing well

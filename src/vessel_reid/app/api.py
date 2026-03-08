@@ -14,6 +14,7 @@ from flask_cors import CORS
 import os
 import torch
 
+from ..paths import FAISS_INDEX_PATH, FAISS_METADATA_PATH, RAW_IMAGES_DIR
 from ..utils.config import load_config
 from . import utils
 
@@ -30,9 +31,8 @@ app_dir = os.path.dirname(os.path.abspath(__file__))
 root = os.path.abspath(os.path.join(app_dir, "..", "..", ".."))
 cfg = load_config(os.path.join(root, "configs", "inference.yaml"))
 
-# Resolve relative faiss paths against the project root
-cfg["faiss"]["index_path"] = os.path.join(root, cfg["faiss"]["index_path"])
-cfg["faiss"]["metadata_path"] = os.path.join(root, cfg["faiss"]["metadata_path"])
+cfg["faiss"]["index_path"] = str(FAISS_INDEX_PATH)
+cfg["faiss"]["metadata_path"] = str(FAISS_METADATA_PATH)
 
 # Load the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -74,7 +74,7 @@ def get_events():
 @app.route("/gallery-image/<path:image_path>")
 def gallery_image(image_path):
     """Serve a gallery image from the dataset images directory."""
-    image_root = os.path.join(root, "dataset", "images")
+    image_root = str(RAW_IMAGES_DIR)
     return send_from_directory(image_root, image_path)
 
 

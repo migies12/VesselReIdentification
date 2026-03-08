@@ -6,6 +6,7 @@ from PIL import Image
 
 from vessel_reid.data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
 from vessel_reid.models.reid_model import ReIDModel
+from vessel_reid.paths import MODEL_CHECKPOINT, FAISS_INDEX_PATH, FAISS_METADATA_PATH
 from vessel_reid.utils.config import load_config
 from vessel_reid.utils.faiss_index import load_index, load_metadata, search
 
@@ -32,12 +33,12 @@ def main() -> None:
         length_embed_dim=cfg["model"]["length_embed_dim"],
         pretrained=False,
     ).to(device)
-    state = torch.load(cfg["model"]["checkpoint"], map_location=device)
+    state = torch.load(str(MODEL_CHECKPOINT), map_location=device)
     model.load_state_dict(state)
     model.eval()
 
-    index = load_index(cfg["faiss"]["index_path"])
-    metadata = load_metadata(cfg["faiss"]["metadata_path"])
+    index = load_index(str(FAISS_INDEX_PATH))
+    metadata = load_metadata(str(FAISS_METADATA_PATH))
 
     transform = build_eval_transforms(cfg["query"]["image_size"])
     image = Image.open(args.image).convert("RGB")

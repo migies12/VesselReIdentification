@@ -6,11 +6,13 @@ from typing import Dict, List
 
 import matplotlib.pyplot as plt
 
+from vessel_reid.paths import TRAIN_STATS_CSV, STATISTICS_DIR
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Visualize training metrics")
-    parser.add_argument("--stats-csv", default="outputs/train_stats.csv", help="Path to train_stats.csv")
-    parser.add_argument("--output-dir", default="outputs", help="Directory to save plots")
+    parser.add_argument("--stats-csv", default=str(TRAIN_STATS_CSV), help="Path to train_stats.csv")
+    parser.add_argument("--output-dir", default=str(STATISTICS_DIR), help="Directory to save plots")
     parser.add_argument("--show", action="store_true", help="Display plots interactively")
     return parser.parse_args()
 
