@@ -30,9 +30,9 @@ from config import (
 
 DATASET_PATH = Path(__file__).resolve().parent / "../../../data/images"
 MASTER_CSV_PATH = DATASET_PATH.parent / "all_labels.csv"
-OUTPUT_PATH = Path(__file__).resolve().parent / "dryrun_filtered_images"
-FILTERED_PATH = Path(__file__).resolve().parent / "dryrun_deleted_images"
-EXCLUDED_PATH = Path(__file__).resolve().parent / "dryrun_excluded_vessels"
+OUTPUT_PATH = DATASET_PATH.parent / "dryrun_filtered_images"
+FILTERED_PATH = DATASET_PATH.parent / "dryrun_deleted_images"
+EXCLUDED_PATH = DATASET_PATH.parent / "dryrun_excluded_vessels"
 
 def compute_cloud_coverage(data):
     """Returns the fraction of pixels identified as cloud."""
@@ -84,7 +84,7 @@ def is_cloudy_filepath(image_path, csv_path=None):
         return get_cloud_coverage(image_path, csv_path) > COVERAGE_THRESHOLD
     with rasterio.open(image_path) as img:
         if img.count < 3:
-            return True
+            return False
         data = img.read([1, 2, 3]).astype(float)
     return is_cloudy(data)
 
