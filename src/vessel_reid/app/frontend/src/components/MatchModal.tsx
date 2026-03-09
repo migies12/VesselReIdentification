@@ -2,6 +2,10 @@ import { Map, Marker, ZoomControl } from "pigeon-maps"
 import { VesselEvent, type GalleryMatch } from "../utils/types";
 import "../styles/MatchModal.css";
 
+const mapProvider = (x: number, y: number, z: number) => {
+  return `https://tiles.stadiamaps.com/tiles/osm_bright/${z}/${x}/${y}.png`;
+}
+
 interface MatchModalProps {
   match: GalleryMatch | null;
   event: VesselEvent | null;
@@ -23,6 +27,7 @@ export default function MatchModal({ match, event, onClose }: MatchModalProps) {
           <div className="map-wrapper">
             <Map
               height={400}
+              provider={mapProvider}
               defaultCenter={mapCenter}
               defaultZoom={5}
             >
