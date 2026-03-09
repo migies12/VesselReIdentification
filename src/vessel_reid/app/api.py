@@ -31,14 +31,8 @@ src_root = os.path.abspath(os.path.join(app_dir, ".."))
 project_root = os.path.abspath(os.path.join(src_root, "..", ".."))
 cfg = load_config(os.path.join(project_root, "configs", "inference.yaml"))
 
-<<<<<<< HEAD
-# Resolve relative faiss paths against the project root
-cfg["faiss"]["index_path"] = os.path.join(src_root, cfg["faiss"]["index_path"])
-cfg["faiss"]["metadata_path"] = os.path.join(src_root, cfg["faiss"]["metadata_path"])
-=======
 cfg["faiss"]["index_path"] = str(FAISS_INDEX_PATH)
 cfg["faiss"]["metadata_path"] = str(FAISS_METADATA_PATH)
->>>>>>> main
 
 # Load the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -75,7 +69,6 @@ def get_events():
 
     except Exception as e:
         return jsonify({"error": f"Failed to fetch events: {str(e)}"}), 500
-<<<<<<< HEAD
     
 @app.route("/events/<event_id>/", methods=["GET"])
 def event(event_id):
@@ -83,7 +76,6 @@ def event(event_id):
     Fetch a specific event from Skylight by event id
     """
     return utils.get_event(event_id)
-=======
 
 
 @app.route("/gallery-image/<path:image_path>")
@@ -92,7 +84,6 @@ def gallery_image(image_path):
     image_root = str(RAW_IMAGES_DIR)
     return send_from_directory(image_root, image_path)
 
->>>>>>> main
 
 @app.route("/events/<event_id>/infer", methods=["POST"])
 def infer(event_id):

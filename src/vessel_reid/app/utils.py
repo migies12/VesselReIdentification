@@ -8,14 +8,10 @@ from PIL import Image
 import requests
 import torch
 
-<<<<<<< HEAD
-from ..data.api_helper import get_access_token, get_event, get_recent_correlated_vessels
-=======
 from ..data.api_helper_skylight import get_access_token, get_recent_correlated_vessels
->>>>>>> main
 from ..data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
 from ..data.filter_clouds import is_cloudy_bytes
-from . import db
+from . import db, utils
 from ..models.reid_model import ReIDModel
 from ..utils.faiss_index import load_index, load_metadata, search
 
@@ -89,15 +85,6 @@ def similarity_search(cfg, embedding):
     }
 
 def fetch_skylight_events(days=7):
-<<<<<<< HEAD
-=======
-    """
-    Fetch recent Sentinel-2 vessel detection events from Skylight API
-
-    Returns a list of events with fields needed by the frontend
-    Uses the same length >= 150m constraint as the training data pipeline
-    Also filters out events with cloudy
->>>>>>> main
     """
     Fetch recent Sentinel-2 vessel detection events from Skylight API
 
@@ -176,7 +163,7 @@ def format_event_helper(record):
     }
 
 def get_event_by_id(event_id):
-    return get_event(ACCESS_TOKEN, event_id)
+    return utils.get_event(ACCESS_TOKEN, event_id)
 
 def download_image(image_url):
     """Download an image from a URL and return (raw_bytes, base64_string)."""
