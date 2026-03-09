@@ -98,6 +98,9 @@ class TripletDataset(Dataset):
             heading = float(row["heading"])
             image = rotate(image, heading)
 
+        if self.cfg.crop:
+            image = crop(image)
+
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)
         if self.cfg.use_length:
@@ -144,6 +147,9 @@ class SingleImageDataset(Dataset):
             heading = float(row["heading"])
             image = rotate(image, heading)
 
+        if self.cfg.crop:
+            image = crop(image)
+
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)
         length_value = None
@@ -177,6 +183,9 @@ class LabeledImageDataset(Dataset):
         if self.cfg.rotate and pd.notna(row.get("heading")):
             heading = float(row["heading"])
             image = rotate(image, heading)
+
+        if self.cfg.crop:
+            image = crop(image)
 
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)
