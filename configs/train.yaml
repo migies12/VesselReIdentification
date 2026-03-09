@@ -1,9 +1,6 @@
 seed: 1337
 
 data:
-  train_csv: dataset/train.csv
-  val_csv: dataset/val.csv
-  image_root: dataset/images
   image_size: 224
   num_workers: 8
   batch_size: 128
@@ -41,5 +38,3 @@ train:
   arcface_scale: 30.0
   arcface_weight: 1.0
   log_every: 50
-  output_dir: outputs
-  checkpoint_name: reid_model.pt

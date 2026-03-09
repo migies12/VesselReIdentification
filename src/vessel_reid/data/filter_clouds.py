@@ -7,43 +7,95 @@ This function uses thresholds for brightness and saturation that can be adjusted
 trial and error and manual inspection, and the results are moderately successful
 """
 
-import numpy as np
-import rasterio
+from collections import defaultdict
 import os
 from pathlib import Path
-from collections import defaultdict
 import shutil
 
-from .populate_data import MIN_IMAGES_PER_VESSEL
+import numpy as np
+import rasterio
 
-DATASET_PATH = Path(__file__).resolve().parent / "../../../data/images"
-OUTPUT_PATH = Path(__file__).resolve().parent / "../../../data/dryrun_filtered_images"
-FILTERED_PATH = Path(__file__).resolve().parent / "../../../data/dryrun_deleted_images"
-EXCLUDED_PATH = Path(__file__).resolve().parent / "../../../data/dryrun_excluded_vessels"
+from . import data_utils
+from vessel_reid.paths import (
+    RAW_IMAGES_DIR      as DATASET_PATH,
+    RAW_METADATA_CSV    as MASTER_CSV_PATH,
+    FILTERED_IMAGES_DIR as OUTPUT_PATH,
+    CLOUDY_EXCLUDED_DIR as FILTERED_PATH,
+    VESSEL_EXCLUDED_DIR as EXCLUDED_PATH,
+)
 
-DRY_RUN = True
+from .config import (
+    MIN_IMAGES_PER_VESSEL,
+    DRY_RUN,
+    BRIGHTNESS_THRESHOLD,
+    SATURATION_THRESHOLD,
+    COVERAGE_THRESHOLD,
+    LUMINANCE_R,
+    LUMINANCE_G,
+    LUMINANCE_B,
+)
 
-BRIGHTNESS_THRESHOLD = 115
-SATURATION_THRESHOLD = 65
-COVERAGE_THRESHOLD = 0.05
 
-LUMINANCE_R = 0.3
-LUMINANCE_G = 0.6
-LUMINANCE_B = 0.1
-
-def is_cloudy(data):
+def compute_cloud_coverage(data):
+    """Returns the fraction of pixels identified as cloud."""
     luminance = (LUMINANCE_R * data[0]) + (LUMINANCE_G * data[1]) + (LUMINANCE_B * data[2])
     colour_diff = np.max(data, axis=0) - np.min(data, axis=0)
     cloud_mask = (luminance > BRIGHTNESS_THRESHOLD) & (colour_diff < SATURATION_THRESHOLD)
-    cloud_fraction = np.sum(cloud_mask) / cloud_mask.size
+    return float(np.sum(cloud_mask) / cloud_mask.size)
 
-    return cloud_fraction > COVERAGE_THRESHOLD
+
+def is_cloudy(data):
+    return compute_cloud_coverage(data) > COVERAGE_THRESHOLD
+
+
+def get_cloud_coverage(image_path, csv_path, rows=None):
+    """
+    Returns the cloud coverage fraction for the image at image_path.
+    Checks csv_path for a cached value first; computes and caches if not found.
+    Optionally accepts an already-loaded rows dict to avoid re-reading the CSV.
+    """
+    filename = Path(image_path).name
+    if rows is None:
+        rows = data_utils.load_csv(csv_path)
+
+    cached = rows.get(filename, {}).get("cloud_coverage", "")
+    if cached != "":
+        return float(cached)
+
+    with rasterio.open(image_path) as img:
+        if img.count < 3:
+            return 0.0
+        data = img.read([1, 2, 3])
+
+    coverage = compute_cloud_coverage(data)
+    row = rows.get(filename, {"image_path": filename, "boat_id": "", "length_m": "", "heading": ""})
+    data_utils.upsert_row(csv_path, {**row, "cloud_coverage": coverage})
+
+    return coverage
+
+
+########################## Standalone Script ##########################
+
+def is_cloudy_filepath(image_path, csv_path=None):
+    """
+    Same as `is_cloudy_bytes`, but operates on the filepath of a downloaded image.
+    For use in the below script, if cloud filtering occurs AFTER data fetch.
+    If csv_path is provided, uses cached cloud coverage from the CSV if available.
+    """
+    if csv_path is not None:
+        return get_cloud_coverage(image_path, csv_path) > COVERAGE_THRESHOLD
+    with rasterio.open(image_path) as img:
+        if img.count < 3:
+            return False
+        data = img.read([1, 2, 3]).astype(float)
+    return is_cloudy(data)
+
 
 def is_cloudy_bytes(image_bytes):
     """
-    Returns True if image is too cloudy, else False
+    Returns True if image is too cloudy, else False.
     For integration with the data fetching script if we need it,
-    because it will allow filtering before saving the image locally
+    because it will allow filtering before saving the image locally.
     """
     with rasterio.MemoryFile(image_bytes) as memfile:
         with memfile.open() as img:
@@ -53,19 +105,6 @@ def is_cloudy_bytes(image_bytes):
 
     return is_cloudy(data)
 
-########################## Standalone Script ##########################
-
-def is_cloudy_filepath(image_path):
-    """
-    Same as `is_cloudy_bytes`, but operates on the filepath of a downloaded image
-    For use in the below script, if cloud filtering occurs AFTER data fetch
-    """
-    with rasterio.open(image_path) as img:
-        if img.count < 3:
-            return False
-        data = img.read([1, 2, 3])
-
-    return is_cloudy(data)
 
 def setup_dryrun_folder(path):
     """
@@ -74,7 +113,7 @@ def setup_dryrun_folder(path):
     if path.exists():
         print(f"Clearing existing files in {OUTPUT_PATH}")
         shutil.rmtree(path, ignore_errors=True)
-    
+
     path.mkdir(parents=True, exist_ok=True)
 
 if __name__ == "__main__":
@@ -87,6 +126,9 @@ if __name__ == "__main__":
     setup_dryrun_folder(FILTERED_PATH)
     setup_dryrun_folder(EXCLUDED_PATH)
 
+    # Load CSV cache once for the whole run
+    rows = data_utils.load_csv(MASTER_CSV_PATH)
+
     # Pass 1: group images by vessel and classify each as cloudy or clean
     vessel_clean = defaultdict(list)   # mmsi -> [filename, ...]
     vessel_cloudy = defaultdict(list)  # mmsi -> [filename, ...]
@@ -94,11 +136,17 @@ if __name__ == "__main__":
     for filename in os.listdir(DATASET_PATH):
         mmsi = filename.split("_")[0]
         path = os.path.join(DATASET_PATH, filename)
-        if is_cloudy_filepath(path):
+        coverage = get_cloud_coverage(path, MASTER_CSV_PATH, rows=rows)
+        rows.setdefault(filename, {"image_path": filename, "boat_id": mmsi, "length_m": "", "heading": ""})
+        rows[filename]["cloud_coverage"] = coverage
+        if coverage > COVERAGE_THRESHOLD:
             vessel_cloudy[mmsi].append(filename)
         else:
             vessel_clean[mmsi].append(filename)
         total_images += 1
+
+    # Write all cached coverages to CSV in one pass
+    data_utils.write_csv(MASTER_CSV_PATH, rows)
 
     # Pass 2: enforce minimum threshold, then copy/delete
     for mmsi in set(vessel_clean) | set(vessel_cloudy):

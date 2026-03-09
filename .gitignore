@@ -17,9 +17,11 @@ runs/
 checkpoints/
 outputs/
 faiss_index/
+/data/
+/model/
+/statistics/
 .env
 node_modules/
 */frontend/dist/
-*.jpg
+*.png
 *.db
-
