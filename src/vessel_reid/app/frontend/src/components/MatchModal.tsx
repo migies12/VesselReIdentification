@@ -15,7 +15,11 @@ interface MatchModalProps {
 export default function MatchModal({ match, event, onClose }: MatchModalProps) {
   if (!match || !event) return null;
 
-  const mapCenter: [number, number] = [event.lat || 0, event.lon || 0];
+  const marker1: [number, number] = [event.lat || 0, event.lon || 0];
+  const marker2: [number, number] = [match.coords[0], match.coords[1]];
+  const mapCenter: [number, number] = [(marker1[0] + marker2[0]) / 2, (marker1[1] + marker2[1]) / 2];
+  const distance = Math.sqrt(Math.pow(marker1[0] + marker2[0], 2) + Math.pow(marker1[1] + marker2[1], 2));
+  const zoom = distance < 0.1 ? 12 : distance < 2 ? 5 : 2;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -29,7 +33,7 @@ export default function MatchModal({ match, event, onClose }: MatchModalProps) {
               height={400}
               provider={mapProvider}
               defaultCenter={mapCenter}
-              defaultZoom={5}
+              defaultZoom={zoom}
             >
               <ZoomControl />
               <Marker
