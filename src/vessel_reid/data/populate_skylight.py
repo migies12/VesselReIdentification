@@ -1,16 +1,16 @@
-import api_helper_skylight as api_helper
+from vessel_reid.data from . import api_helper_skylight as api_helper
 from collections import defaultdict
 from dotenv import load_dotenv
 import os
 import requests
 
-from config import (
+from .config import (
     MIN_IMAGES_PER_VESSEL,
     BACKFILL_LOOKBACK_DAYS,
     BACKFILL_EVENT_TYPES,
     BACKFILL_MIN_ESTIMATED_LENGTH,
 )
-import data_utils
+from . import data_utils
 from vessel_reid.paths import RAW_IMAGES_DIR, RAW_METADATA_CSV, FETCHED_EVENT_IDS_PATH
 
 IMAGE_DST_PATH  = RAW_IMAGES_DIR

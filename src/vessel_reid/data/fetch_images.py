@@ -1,11 +1,11 @@
 import argparse
 import importlib
 
-from config import DEFAULT_DATA_SOURCE
+from .config import DEFAULT_DATA_SOURCE
 
 SOURCES = {
-    "gql": "populate_skylight",
-    "es": "populate_elastic",
+    "gql": "vessel_reid.data.populate_skylight",
+    "es": "vessel_reid.data.populate_elastic",
 }
 
 if __name__ == "__main__":

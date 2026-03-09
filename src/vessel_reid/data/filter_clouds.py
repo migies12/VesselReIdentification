@@ -15,7 +15,7 @@ import shutil
 import numpy as np
 import rasterio
 
-import data_utils
+from . import data_utils
 from vessel_reid.paths import (
     RAW_IMAGES_DIR      as DATASET_PATH,
     RAW_METADATA_CSV    as MASTER_CSV_PATH,
@@ -24,7 +24,7 @@ from vessel_reid.paths import (
     VESSEL_EXCLUDED_DIR as EXCLUDED_PATH,
 )
 
-from config import (
+from .config import (
     MIN_IMAGES_PER_VESSEL,
     DRY_RUN,
     BRIGHTNESS_THRESHOLD,

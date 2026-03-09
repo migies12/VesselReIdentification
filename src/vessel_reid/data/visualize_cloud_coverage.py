@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import config
+from . import config
 from vessel_reid.paths import RAW_METADATA_CSV as CSV_PATH
 
 

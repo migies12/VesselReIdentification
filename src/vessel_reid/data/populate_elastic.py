@@ -1,11 +1,11 @@
-import api_helper_elastic
+from . import api_helper_elastic
 from collections import defaultdict
 from dotenv import load_dotenv
 import os
 import requests
 from tqdm import tqdm
 
-import data_utils
+from . import data_utils
 from vessel_reid.paths import RAW_IMAGES_DIR, RAW_METADATA_CSV, FETCHED_EVENT_IDS_PATH
 
 IMAGE_DST_PATH  = RAW_IMAGES_DIR
