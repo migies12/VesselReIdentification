@@ -20,6 +20,8 @@ FILTERED_IMAGES_DIR = REPO_ROOT / "data" / "images" / "filtered"
 CLOUDY_EXCLUDED_DIR = REPO_ROOT / "data" / "images" / "cloudyExcluded"
 VESSEL_EXCLUDED_DIR = REPO_ROOT / "data" / "images" / "vesselExcluded"
 
+CROPPED_IMAGES_DIR = REPO_ROOT / "data" / "images" / "cropped"
+
 # ---------------------------------------------------------------------------
 # data, metadata: csvs and other tracking files for data
 # ---------------------------------------------------------------------------
