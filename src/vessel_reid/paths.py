@@ -20,6 +20,7 @@ FILTERED_IMAGES_DIR = REPO_ROOT / "data" / "images" / "filtered"
 CLOUDY_EXCLUDED_DIR = REPO_ROOT / "data" / "images" / "cloudyExcluded"
 VESSEL_EXCLUDED_DIR = REPO_ROOT / "data" / "images" / "vesselExcluded"
 
+ROTATED_IMAGES_DIR = REPO_ROOT / "data" / "images" / "rotated"
 CROPPED_IMAGES_DIR = REPO_ROOT / "data" / "images" / "cropped"
 
 # ---------------------------------------------------------------------------

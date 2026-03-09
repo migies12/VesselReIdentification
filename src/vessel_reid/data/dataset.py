@@ -22,7 +22,8 @@ class DataConfig:
     use_length: bool
     length_mean: float
     length_std: float
-    rotate_by_direction: bool = False
+    rotate: bool = False
+    crop: bool = False
     augment: bool = False
 
 
@@ -93,7 +94,7 @@ class TripletDataset(Dataset):
         image_path = f"{self.cfg.image_root}/{row['image_path']}"
         image = Image.open(image_path).convert("RGB")
 
-        if self.cfg.rotate_by_direction and pd.notna(row.get("heading")):
+        if self.cfg.rotate and pd.notna(row.get("heading")):
             heading = float(row["heading"])
             image = rotate(image, heading)
 
@@ -139,7 +140,7 @@ class SingleImageDataset(Dataset):
         image_path = f"{self.cfg.image_root}/{row['image_path']}"
         image = Image.open(image_path).convert("RGB")
 
-        if self.cfg.rotate_by_direction and pd.notna(row.get("heading")):
+        if self.cfg.rotate and pd.notna(row.get("heading")):
             heading = float(row["heading"])
             image = rotate(image, heading)
 
@@ -173,9 +174,9 @@ class LabeledImageDataset(Dataset):
         image_path = f"{self.cfg.image_root}/{row['image_path']}"
         image = Image.open(image_path).convert("RGB")
 
-        if self.cfg.rotate_by_direction and pd.notna(row.get("heading")):
+        if self.cfg.rotate and pd.notna(row.get("heading")):
             heading = float(row["heading"])
-            image = rotate_and_crop_by_heading(image, heading)
+            image = rotate(image, heading)
 
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)
