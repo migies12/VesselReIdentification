@@ -1,5 +1,6 @@
 import csv
 from pathlib import Path
+import shutil
 
 CSV_FIELDNAMES = ["image_path", "boat_id", "length_m", "heading", "cloud_coverage"]
 
@@ -76,3 +77,15 @@ def upsert_row(csv_path: Path, row: dict) -> None:
         writer.writeheader()
         for key in sorted(rows.keys()):
             writer.writerow(rows[key])
+
+def setup_dryrun_folder(path):
+    """
+    Helper pre-processing scripts
+    Prepares the output folder specified by `path` by deleting existing data inside the folder
+    Used by `filter_clouds` and `crop_water`
+    """
+    if path.exists():
+        print(f"Clearing existing files in {path}")
+        shutil.rmtree(path, ignore_errors=True)
+
+    path.mkdir(parents=True, exist_ok=True)

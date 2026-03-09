@@ -106,25 +106,15 @@ def is_cloudy_bytes(image_bytes):
     return is_cloudy(data)
 
 
-def setup_dryrun_folder(path):
-    """
-    Helper for the script below
-    """
-    if path.exists():
-        print(f"Clearing existing files in {OUTPUT_PATH}")
-        shutil.rmtree(path, ignore_errors=True)
-
-    path.mkdir(parents=True, exist_ok=True)
-
 if __name__ == "__main__":
     total_images = 0
     cloudy_images = 0
     excluded_vessels = 0
     excluded_images = 0
 
-    setup_dryrun_folder(OUTPUT_PATH)
-    setup_dryrun_folder(FILTERED_PATH)
-    setup_dryrun_folder(EXCLUDED_PATH)
+    data_utils.setup_dryrun_folder(OUTPUT_PATH)
+    data_utils.setup_dryrun_folder(FILTERED_PATH)
+    data_utils.setup_dryrun_folder(EXCLUDED_PATH)
 
     # Load CSV cache once for the whole run
     rows = data_utils.load_csv(MASTER_CSV_PATH)
