@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchEvents, inferEvent } from "./api";
-import type { VesselEvent, InferenceResult } from "./types";
-import "./index.css";
+import { fetchEvents, inferEvent } from "./utils/api";
+import { type VesselEvent, type InferenceResult, type GalleryMatch } from "./utils/types";
+import "./styles/index.css";
+import MatchModal from "./components/MatchModal";
 
 function formatTime(iso: string | null): string {
   if (!iso) return "—";
@@ -20,6 +21,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<GalleryMatch | null>(null);
 
   const cache = useRef<Record<string, InferenceResult>>({});
 
@@ -49,7 +51,7 @@ export default function App() {
   }, [events, cursor]);
 
   const currentEvent = events[cursor] ?? null;
-  const top3 = result?.all_results.slice(0, 3) ?? [];
+  const top3 = result?.all_results?.slice(0, 3) ?? [];
 
   function handleInfer() {
     if (!currentEvent || loading) return;
@@ -102,8 +104,6 @@ export default function App() {
       </header>
 
       {loadingEvents && <div className="status-msg">Loading events…</div>}
-      {/* {error && <div className="status-msg error">{error}</div>} */}
-
       {!loadingEvents && currentEvent && (
         <>
           <div className="main-panel">
@@ -137,7 +137,7 @@ export default function App() {
                   </tr>
                   <tr>
                     <th>Heading</th>
-                    <td>{currentEvent.orientation != null ? `${currentEvent.orientation}°` : "—"}</td>
+                    <td>{currentEvent.heading != null ? `${currentEvent.heading}°` : "—"}</td>
                   </tr>
                   <tr>
                     <th>Detection Score</th>
@@ -148,14 +148,14 @@ export default function App() {
                     <th>Location</th>
                     <td>{formatCoord(currentEvent.lat)}, {formatCoord(currentEvent.lon)}</td>
                   </tr>
-                  {result && (
+                  {/* {result && (
                     <tr>
                       <th>Re-ID</th>
                       <td className={result.matched ? "tag-match" : "tag-no-match"}>
                         {result.matched ? "Match found" : "No match"}
                       </td>
                     </tr>
-                  )}
+                  )} */}
                 </tbody>
               </table>
             </div>
@@ -164,6 +164,7 @@ export default function App() {
           <div className="matches-section">
             <h2>Top Matches</h2>
             {loading && <div className="status-msg">Running inference…</div>}
+            {error && <div className="status-msg error">{error}</div>}
             {!loading && !result && !error && (
               <div className="status-msg">Press "Run Re-ID" to see matches</div>
             )}
@@ -172,10 +173,14 @@ export default function App() {
             )}
             <div className="matches-grid">
               {top3.map((match, i) => (
-                <div key={i} className="match-card">
+                <div 
+                  key={i} 
+                  className="match-card"
+                  onClick={() => setSelectedMatch(match)}
+                >
                   <div className="match-image-box">
                     <img
-                      src={`/gallery-image/${match.image_path}`}
+                      src={match.image_url}
                       alt={`Match ${i + 1}`}
                       className="match-image"
                       onError={(e) => {
@@ -197,6 +202,12 @@ export default function App() {
           </div>
         </>
       )}
+
+      <MatchModal
+        match={selectedMatch}
+        event={currentEvent}
+        onClose={() => setSelectedMatch(null)}
+      />
     </div>
   );
 }

@@ -82,7 +82,7 @@ def get_recent_correlated_vessels(access_token: str, days: int, min_length: int 
                                 estimatedLength
                                 frameIds
                                 imageUrl
-                                orientation
+                                heading
                             }
                         }
                     }
@@ -181,7 +181,6 @@ def get_recent_correlated_events_for_vessel(
                             estimatedLength
                             frameIds
                             imageUrl
-                            orientation
                             heading
                         }
                         ... on ViirsEventDetails {
@@ -276,7 +275,6 @@ def get_event(access_token: str, event_id: str):
                             estimatedLength
                             frameIds
                             imageUrl
-                            orientation
                             heading
                         }
                     }

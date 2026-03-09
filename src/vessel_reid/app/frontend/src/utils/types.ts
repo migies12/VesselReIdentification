@@ -7,18 +7,21 @@ export interface VesselEvent {
   country_code: string | null;
   image_url: string | null;
   estimated_length: number | null;
-  orientation: number | null;
+  heading: number | null;
   detection_score: number | null;
   lat: number | null;
   lon: number | null;
-  time: string | null;
+  time: string;
 }
 
 export interface GalleryMatch {
   score: number;
   boat_id: string;
   image_path: string;
-  length_m: number | null;
+  image_url: string;
+  length_m: number;
+  coords: [number, number];
+  time: string;
 }
 
 export interface InferenceResult {

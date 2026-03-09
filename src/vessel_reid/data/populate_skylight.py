@@ -1,8 +1,11 @@
-from vessel_reid.data from . import api_helper_skylight as api_helper
 from collections import defaultdict
 from dotenv import load_dotenv
 import os
 import requests
+from vessel_reid.paths import RAW_IMAGES_DIR, RAW_METADATA_CSV, FETCHED_EVENT_IDS_PATH
+
+from . import api_helper_skylight as api_helper
+from . import data_utils
 
 from .config import (
     MIN_IMAGES_PER_VESSEL,
@@ -10,8 +13,6 @@ from .config import (
     BACKFILL_EVENT_TYPES,
     BACKFILL_MIN_ESTIMATED_LENGTH,
 )
-from . import data_utils
-from vessel_reid.paths import RAW_IMAGES_DIR, RAW_METADATA_CSV, FETCHED_EVENT_IDS_PATH
 
 IMAGE_DST_PATH  = RAW_IMAGES_DIR
 MASTER_CSV_PATH = RAW_METADATA_CSV
@@ -128,7 +129,7 @@ def run(days: int = 30) -> None:
                 vessel_images[mmsi].extend(backfilled)
                 events_list = vessel_images[mmsi]
                 if VERBOSE:
-                    print(f"  Added {len(backfilled)} images from backfill (total now {len(events_list)})")
+                    print(f"Added {len(backfilled)} images from backfill (total now {len(events_list)})")
 
         if len(events_list) < MIN_IMAGES_PER_VESSEL:
             if VERBOSE:

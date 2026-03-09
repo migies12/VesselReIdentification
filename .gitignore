@@ -23,5 +23,5 @@ faiss_index/
 .env
 node_modules/
 */frontend/dist/
-*.jpg
 *.png
+*.db
