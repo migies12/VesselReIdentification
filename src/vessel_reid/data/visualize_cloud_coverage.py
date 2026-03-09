@@ -1,11 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from pathlib import Path
-
-import config
-
-CSV_PATH = Path(__file__).resolve().parent / "../../../data/all_labels.csv"
+from . import config
+from vessel_reid.paths import RAW_METADATA_CSV as CSV_PATH
 
 
 def load_data() -> pd.DataFrame:

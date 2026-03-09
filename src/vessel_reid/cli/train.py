@@ -13,6 +13,15 @@ import torch.nn.functional as F
 
 from vessel_reid.data.dataset import DataConfig, LabeledImageDataset, PKBatchSampler
 from vessel_reid.models.reid_model import ReIDModel
+from vessel_reid.paths import (
+    TRAIN_CSV,
+    RAW_IMAGES_DIR,
+    MODEL_CHECKPOINT,
+    TRAIN_STATS_CSV,
+    TRAIN_STATS_JSON,
+    LOSS_CURVE_PNG,
+    MODEL_DIR,
+)
 from vessel_reid.utils.config import load_config
 from vessel_reid.utils.seed import seed_everything
 
@@ -301,12 +310,12 @@ def main() -> None:
     length_mean = cfg["data"].get("length_mean")
     length_std = cfg["data"].get("length_std")
     if cfg["data"]["use_length"] and cfg["data"].get("compute_length_stats", False):
-        length_mean, length_std, count = compute_length_stats(cfg["data"]["train_csv"])
+        length_mean, length_std, count = compute_length_stats(str(TRAIN_CSV))
         print(f"computed length stats from train.csv: mean={length_mean:.4f} std={length_std:.4f} count={count}")
 
     data_cfg = DataConfig(
-        csv_path=cfg["data"]["train_csv"],
-        image_root=cfg["data"]["image_root"],
+        csv_path=str(TRAIN_CSV),
+        image_root=str(RAW_IMAGES_DIR),
         image_size=cfg["data"]["image_size"],
         use_length=cfg["data"]["use_length"],
         length_mean=float(length_mean),
@@ -386,10 +395,10 @@ def main() -> None:
     use_amp = device.type == "cuda"
     scaler = GradScaler(enabled=use_amp)
 
-    os.makedirs(cfg["train"]["output_dir"], exist_ok=True)
-    stats_csv = os.path.join(cfg["train"]["output_dir"], "train_stats.csv")
-    stats_json = os.path.join(cfg["train"]["output_dir"], "train_stats.json")
-    stats_plot = os.path.join(cfg["train"]["output_dir"], "loss_curve.png")
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    stats_csv = str(TRAIN_STATS_CSV)
+    stats_json = str(TRAIN_STATS_JSON)
+    stats_plot = str(LOSS_CURVE_PNG)
     history = []
 
     for epoch in range(cfg["train"]["epochs"]):
@@ -429,9 +438,8 @@ def main() -> None:
         save_stats_json(stats_json, history)
         maybe_plot_metrics(stats_csv, stats_plot)
 
-    checkpoint_path = os.path.join(cfg["train"]["output_dir"], cfg["train"]["checkpoint_name"])
-    torch.save(model.state_dict(), checkpoint_path)
-    print(f"saved model to {checkpoint_path}")
+    torch.save(model.state_dict(), str(MODEL_CHECKPOINT))
+    print(f"saved model to {MODEL_CHECKPOINT}")
 
 
 if __name__ == "__main__":

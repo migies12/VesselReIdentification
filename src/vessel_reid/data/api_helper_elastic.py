@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 from dotenv import load_dotenv
 from tqdm import tqdm
 
-from config import MIN_IMAGES_PER_VESSEL
+from .config import MIN_IMAGES_PER_VESSEL
 
 ES_INDEX = "event-history"
 ES_VERIFY_SSL = True
