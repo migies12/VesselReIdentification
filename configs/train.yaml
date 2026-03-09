@@ -10,6 +10,7 @@ data:
   length_std: 44.8894
   rotate: false
   crop: false
+  normalize: false
   augment: true
   pk_sampler:
     enabled: true

@@ -11,7 +11,7 @@ import torch
 from . import db
 
 from ..data.api_helper_skylight import get_access_token, get_event, get_recent_correlated_vessels
-from ..data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
+from ..data.dataset import apply_transforms, build_eval_transforms, rotate
 from ..data.filter_clouds import is_cloudy_bytes
 from ..models.reid_model import ReIDModel
 from ..utils.faiss_index import load_index, load_metadata, search
@@ -41,7 +41,7 @@ def transform_image(cfg, img, heading, device):
     image = Image.open(io.BytesIO(img)).convert("RGB")
     rotate_by_direction = cfg["query"].get("rotate_by_direction", False)
     if rotate_by_direction and heading is not None:
-        image = rotate_and_crop_by_heading(image, heading)
+        image = rotate(image, heading)
     image = apply_transforms(image, transform).unsqueeze(0).to(device)
     return image
 

@@ -12,6 +12,7 @@ from torch.utils.data import Dataset, Sampler
 from typing import Dict, List, Optional, Tuple
 
 from .crop import crop
+from .normalize import normalize_background
 from .rotate import rotate
 
 @dataclass
@@ -24,6 +25,7 @@ class DataConfig:
     length_std: float
     rotate: bool = False
     crop: bool = False
+    normalize: bool = False
     augment: bool = False
 
 
@@ -101,6 +103,9 @@ class TripletDataset(Dataset):
         if self.cfg.crop:
             image = crop(image)
 
+        if self.cfg.normalize:
+            image = normalize_background(image)
+
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)
         if self.cfg.use_length:
@@ -150,6 +155,9 @@ class SingleImageDataset(Dataset):
         if self.cfg.crop:
             image = crop(image)
 
+        if self.cfg.normalize:
+            image = normalize_background(image)
+
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)
         length_value = None
@@ -186,6 +194,9 @@ class LabeledImageDataset(Dataset):
 
         if self.cfg.crop:
             image = crop(image)
+
+        if self.cfg.normalize:
+            image = normalize_background(image)
 
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)
