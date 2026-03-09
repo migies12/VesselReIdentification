@@ -10,8 +10,7 @@ from . import data_utils
 from .config import (
     MIN_IMAGES_PER_VESSEL,
     BACKFILL_LOOKBACK_DAYS,
-    BACKFILL_EVENT_TYPES,
-    BACKFILL_MIN_ESTIMATED_LENGTH,
+    MIN_ESTIMATED_LENGTH,
 )
 
 IMAGE_DST_PATH  = RAW_IMAGES_DIR
@@ -25,40 +24,22 @@ def run(days: int = 30) -> None:
     access_token = api_helper.get_access_token(os.getenv("SKYLIGHT_USERNAME"), os.getenv("SKYLIGHT_PASSWORD"))
     fetched_event_ids = data_utils.load_fetched_event_ids(FETCHED_EVENT_IDS_PATH)
 
-    # Fetch all pages of results
-    all_events = []
-    offset = 0
-    limit = 1000
+    limit = 2000
 
     print("Fetching vessel detections from Skylight API...")
-    while True:
-        print(f"  Fetching events {offset} to {offset + limit}...")
-        response = api_helper.get_recent_correlated_vessels(
-            access_token,
-            days,
-            offset,
-            limit=limit,
-            event_types=BACKFILL_EVENT_TYPES,
-            min_estimated_length=BACKFILL_MIN_ESTIMATED_LENGTH,
-        )
+    response = api_helper.get_recent_correlated_vessels(
+        access_token,
+        days,
+        MIN_ESTIMATED_LENGTH,
+    )
 
-        records = response["records"]
-        total = response["meta"]["total"]
-        all_events.extend(records)
-
-        print(f"  Retrieved {len(records)} events (total available: {total})")
-
-        if offset + len(records) >= total:
-            break
-
-        offset += limit
-
-    print(f"\nFetched {len(all_events)} total events across all pages")
+    records = response["records"]
+    print(f"\nFetched {len(records)} total events across all pages")
 
     # Track images per vessel
     vessel_images = defaultdict(list)
     seen_event_ids = set()
-    for event in all_events:
+    for event in records:
         if event["eventId"] in seen_event_ids:
             continue
         seen_event_ids.add(event["eventId"])
@@ -69,7 +50,7 @@ def run(days: int = 30) -> None:
 
     # Log statistics
     print(f"\nTotal vessels detected: {len(vessel_images)}")
-    print(f"Total events: {len(all_events)}")
+    print(f"Total events: {len(records)}")
     if VERBOSE:
         print("\nImages per vessel:")
         for mmsi, events_list in sorted(vessel_images.items(), key=lambda x: len(x[1]), reverse=True):
@@ -179,3 +160,6 @@ def run(days: int = 30) -> None:
 
     data_utils.save_event_ids(FETCHED_EVENT_IDS_PATH, downloaded_event_ids)
     print(f"\nSaved {len(downloaded_event_ids)} event IDs to {FETCHED_EVENT_IDS_PATH}")
+
+if __name__ == "__main__":
+    run()
