@@ -75,7 +75,7 @@ def event(event_id):
     """
     Fetch a specific event from Skylight by event id
     """
-    return utils.get_event(event_id)
+    return utils.get_event_by_id(event_id)
 
 
 @app.route("/gallery-image/<path:image_path>")
@@ -106,6 +106,7 @@ def infer(event_id):
         for result in top_k_results["all_results"]:
             result_event_id_parts = result["image_path"].split("_", 1)[1].rsplit(".", 1)[0].rsplit("_", 2)
             result_event_id = f"{result_event_id_parts[0]}.{result_event_id_parts[1]}_{result_event_id_parts[2]}"
+            app.logger.warning(result_event_id)
             fetched_event = utils.get_event_by_id(result_event_id)
 
             result["image_url"] = fetched_event["eventDetails"]["imageUrl"] if fetched_event else None

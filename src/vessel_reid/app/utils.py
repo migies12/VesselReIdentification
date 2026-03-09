@@ -8,10 +8,11 @@ from PIL import Image
 import requests
 import torch
 
-from ..data.api_helper_skylight import get_access_token, get_recent_correlated_vessels
+from . import db
+
+from ..data.api_helper_skylight import get_access_token, get_event, get_recent_correlated_vessels
 from ..data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
 from ..data.filter_clouds import is_cloudy_bytes
-from . import db, utils
 from ..models.reid_model import ReIDModel
 from ..utils.faiss_index import load_index, load_metadata, search
 
@@ -163,7 +164,7 @@ def format_event_helper(record):
     }
 
 def get_event_by_id(event_id):
-    return utils.get_event(ACCESS_TOKEN, event_id)
+    return get_event(ACCESS_TOKEN, event_id)
 
 def download_image(image_url):
     """Download an image from a URL and return (raw_bytes, base64_string)."""
