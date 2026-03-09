@@ -106,13 +106,13 @@ def infer(event_id):
         for result in top_k_results["all_results"]:
             result_event_id_parts = result["image_path"].split("_", 1)[1].rsplit(".", 1)[0].rsplit("_", 2)
             result_event_id = f"{result_event_id_parts[0]}.{result_event_id_parts[1]}_{result_event_id_parts[2]}"
-            app.logger.warning(result_event_id)
             fetched_event = utils.get_event_by_id(result_event_id)
 
-            result["image_url"] = fetched_event["eventDetails"]["imageUrl"] if fetched_event else None
-            result["boat_id"] = result["image_path"].split("_", 1)[0]
-
-            top_k_results_with_image_url.append(result)
+            if fetched_event:
+                result["image_url"] = fetched_event["eventDetails"]["imageUrl"] if fetched_event else None
+                result["boat_id"] = result["image_path"].split("_", 1)[0]
+                result["coords"] = [fetched_event["start"]["point"]["lat"], fetched_event["start"]["point"]["lon"]]
+                top_k_results_with_image_url.append(result)
 
         return jsonify({
             "event": event,

@@ -19,7 +19,8 @@ export interface GalleryMatch {
   boat_id: string;
   image_path: string;
   image_url: string;
-  length_m: number | null;
+  length_m: number;
+  coords: [number, number];
 }
 
 export interface InferenceResult {

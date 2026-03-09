@@ -32,6 +32,11 @@ export default function MatchModal({ match, event, onClose }: MatchModalProps) {
                 anchor={[event.lat || 0, event.lon || 0]}
                 color="hsl(210, 100%, 50%)"
               />
+              <Marker
+                width={40}
+                anchor={[match.coords[0], match.coords[1]]}
+                color="hsl(350, 100%, 50%)"
+              />
             </Map>
           </div>
           
