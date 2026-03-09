@@ -1,6 +1,9 @@
 import { Map, Marker, ZoomControl } from "pigeon-maps"
+import { getZoom, getHaversineDistance, getMapCentre, getTimeDifference } from "../utils/map_helper.ts";
 import { VesselEvent, type GalleryMatch } from "../utils/types";
 import "../styles/MatchModal.css";
+
+const KM_TO_KNOTS = 1.852;
 
 const mapProvider = (x: number, y: number, z: number) => {
   return `https://tiles.stadiamaps.com/tiles/osm_bright/${z}/${x}/${y}.png`;
@@ -17,9 +20,11 @@ export default function MatchModal({ match, event, onClose }: MatchModalProps) {
 
   const marker1: [number, number] = [event.lat || 0, event.lon || 0];
   const marker2: [number, number] = [match.coords[0], match.coords[1]];
-  const mapCenter: [number, number] = [(marker1[0] + marker2[0]) / 2, (marker1[1] + marker2[1]) / 2];
-  const distance = Math.sqrt(Math.pow(marker1[0] - marker2[0], 2) + Math.pow(marker1[1] - marker2[1], 2));
-  const zoom = distance < 0.5 ? 10 : distance < 75 ? 4 : 2;
+  const mapCentre: [number, number] = getMapCentre(marker1, marker2);
+  const zoom: number = getZoom(marker1, marker2);
+  const distance: number = getHaversineDistance(marker1, marker2);
+  const timeDifference: number = getTimeDifference(match.time, event.time);
+  const avgSpeed: number = timeDifference > 0 ? distance / timeDifference / KM_TO_KNOTS : 0;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -32,7 +37,7 @@ export default function MatchModal({ match, event, onClose }: MatchModalProps) {
             <Map
               height={400}
               provider={mapProvider}
-              defaultCenter={mapCenter}
+              defaultCenter={mapCentre}
               defaultZoom={zoom}
             >
               <ZoomControl />
@@ -51,7 +56,10 @@ export default function MatchModal({ match, event, onClose }: MatchModalProps) {
           
           <div className="modal-info-grid">
              <p><strong>Confidence:</strong> {(match.score * 100).toFixed(1)}%</p>
-             <p><strong>Vessel Length:</strong> {match.length_m}m</p>
+             <p><strong>Vessel Length:</strong> {match.length_m} m</p>
+             <p><strong>Distance:</strong> {Math.round(distance)} km</p>
+             <p><strong>Elapsed Time:</strong> {Math.round(timeDifference)} hrs</p>
+             <p><strong>Implied Speed:</strong> {avgSpeed.toFixed(1)} kts</p>
           </div>
         </div>
       </div>

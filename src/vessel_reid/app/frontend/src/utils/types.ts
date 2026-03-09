@@ -11,7 +11,7 @@ export interface VesselEvent {
   detection_score: number | null;
   lat: number | null;
   lon: number | null;
-  time: string | null;
+  time: string;
 }
 
 export interface GalleryMatch {
@@ -21,6 +21,7 @@ export interface GalleryMatch {
   image_url: string;
   length_m: number;
   coords: [number, number];
+  time: string;
 }
 
 export interface InferenceResult {

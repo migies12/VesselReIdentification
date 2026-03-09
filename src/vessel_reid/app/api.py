@@ -112,6 +112,7 @@ def infer(event_id):
                 result["image_url"] = fetched_event["eventDetails"]["imageUrl"] if fetched_event else None
                 result["boat_id"] = result["image_path"].split("_", 1)[0]
                 result["coords"] = [fetched_event["start"]["point"]["lat"], fetched_event["start"]["point"]["lon"]]
+                result["time"] = fetched_event["start"]["time"]
                 top_k_results_with_image_url.append(result)
 
         return jsonify({
