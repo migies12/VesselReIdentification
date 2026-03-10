@@ -18,7 +18,8 @@ data:
   pk_sampler:
     enabled: true
     p: 8
-    k: 8
+    k: 4
+    min_samples_per_id: 2
     batches_per_epoch: 1000
 
 model:
@@ -34,12 +35,15 @@ train:
   weight_decay: 0.00001
   margin: 0.3
   loss: combined
-  triplet_weight: 2.0
+  triplet_weight: 1.0
+  triplet_warmup_epochs: 5
   triplet:
     distance: cosine
-    margin: 0.2
+    margin: 0.1
     softplus: true
   arcface_margin: 0.5
   arcface_scale: 30.0
-  arcface_weight: 0.5
+  arcface_weight: 1.0
+  arcface_warmup_epochs: 1
+  grad_clip_norm: 5.0
   log_every: 50

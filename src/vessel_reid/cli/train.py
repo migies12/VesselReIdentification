@@ -6,7 +6,6 @@ from typing import Dict, Optional, Tuple
 
 import torch
 from torch import nn
-from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn.functional as F
@@ -54,7 +53,13 @@ class BatchHardTripletLoss(nn.Module):
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
         n = embeddings.size(0)
         if n <= 1:
-            return embeddings.sum() * 0.0, {"pos_dist": 0.0, "neg_dist": 0.0, "valid_frac": 0.0}
+            return embeddings.sum() * 0.0, {
+                "pos_dist": 0.0,
+                "neg_dist": 0.0,
+                "valid_frac": 0.0,
+                "margin_gap": 0.0,
+                "active_frac": 0.0,
+            }
 
         distance = self.distance.lower()
         if distance == "cosine":
@@ -90,13 +95,30 @@ class BatchHardTripletLoss(nn.Module):
             pos_mean = hardest_pos[valid].mean().item()
             neg_mean = hardest_neg[valid].mean().item()
             valid_frac = valid.float().mean().item()
+            margin_gap = (hardest_neg[valid] - hardest_pos[valid]).mean().item()
+            active_frac = (raw[valid] > 0).float().mean().item()
         else:
             loss = embeddings.sum() * 0.0
             pos_mean = 0.0
             neg_mean = 0.0
             valid_frac = 0.0
+            margin_gap = 0.0
+            active_frac = 0.0
 
-        return loss, {"pos_dist": pos_mean, "neg_dist": neg_mean, "valid_frac": valid_frac}
+        return loss, {
+            "pos_dist": pos_mean,
+            "neg_dist": neg_mean,
+            "valid_frac": valid_frac,
+            "margin_gap": margin_gap,
+            "active_frac": active_frac,
+        }
+
+
+def resolve_loss_weight(base_weight: float, epoch: int, warmup_epochs: int) -> float:
+    if warmup_epochs <= 0:
+        return base_weight
+    scale = min(1.0, float(epoch + 1) / float(warmup_epochs))
+    return base_weight * scale
 
 
 class ArcFaceHead(nn.Module):
@@ -126,15 +148,16 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     criterion: BatchHardTripletLoss,
     arcface_head: Optional[ArcFaceHead],
-    arcface_weight: float,
-    triplet_weight: float,
     use_arcface: bool,
     use_triplet: bool,
     device: torch.device,
     use_amp: bool,
     log_every: int,
-    scaler: GradScaler,
-) -> Tuple[float, float, float, float, float]:
+    scaler: torch.amp.GradScaler,
+    triplet_weight: float,
+    arcface_weight: float,
+    grad_clip_norm: float,
+) -> Tuple[float, float, float, float, float, float, float, float]:
     model.train()
     if use_arcface and arcface_head is None:
         raise ValueError("arcface_head must be provided when use_arcface=true")
@@ -143,15 +166,24 @@ def train_one_epoch(
     total_neg = 0.0
     total_valid = 0.0
     total_arcface = 0.0
+    total_triplet = 0.0
+    total_gap = 0.0
+    total_active = 0.0
     for step, batch in enumerate(tqdm(loader, desc="train", leave=False)):
         images, lengths, labels = move_batch(batch, device)
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
 
         # Mixed precision forward pass
-        with autocast(enabled=use_amp):
+        with torch.amp.autocast(device_type=device.type, enabled=use_amp):
             embeddings = model(images, lengths)
             triplet_loss = torch.tensor(0.0, device=device)
-            stats = {"pos_dist": 0.0, "neg_dist": 0.0, "valid_frac": 0.0}
+            stats = {
+                "pos_dist": 0.0,
+                "neg_dist": 0.0,
+                "valid_frac": 0.0,
+                "margin_gap": 0.0,
+                "active_frac": 0.0,
+            }
             if use_triplet:
                 triplet_loss, stats = criterion(embeddings, labels)
 
@@ -169,6 +201,11 @@ def train_one_epoch(
 
         # Mixed precision backward pass
         scaler.scale(loss).backward()
+        if grad_clip_norm > 0:
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip_norm)
+            if use_arcface:
+                torch.nn.utils.clip_grad_norm_(arcface_head.parameters(), grad_clip_norm)
         scaler.step(optimizer)
         scaler.update()
 
@@ -177,21 +214,41 @@ def train_one_epoch(
         total_neg += stats["neg_dist"]
         total_valid += stats["valid_frac"]
         total_arcface += arcface_loss.item() if use_arcface else 0.0
+        total_triplet += triplet_loss.item() if use_triplet else 0.0
+        total_gap += stats["margin_gap"]
+        total_active += stats["active_frac"]
         if (step + 1) % log_every == 0:
             avg = total_loss / (step + 1)
             pos = total_pos / (step + 1)
             neg = total_neg / (step + 1)
             valid = total_valid / (step + 1)
+            trip = total_triplet / (step + 1)
+            gap = total_gap / (step + 1)
+            active = total_active / (step + 1)
             if use_arcface:
                 arc = total_arcface / (step + 1)
                 tqdm.write(
-                    f"step {step + 1}: loss {avg:.4f} arc {arc:.4f} pos {pos:.3f} neg {neg:.3f} valid {valid:.2f}"
+                    f"step {step + 1}: loss {avg:.4f} arc {arc:.4f} trip {trip:.4f} "
+                    f"pos {pos:.3f} neg {neg:.3f} gap {gap:.3f} active {active:.2f} valid {valid:.2f}"
                 )
             else:
-                tqdm.write(f"step {step + 1}: loss {avg:.4f} pos {pos:.3f} neg {neg:.3f} valid {valid:.2f}")
+                tqdm.write(
+                    f"step {step + 1}: loss {avg:.4f} trip {trip:.4f} "
+                    f"pos {pos:.3f} neg {neg:.3f} gap {gap:.3f} active {active:.2f} valid {valid:.2f}"
+                )
     denom = max(len(loader), 1)
     arcface_avg = total_arcface / denom if use_arcface else 0.0
-    return total_loss / denom, total_pos / denom, total_neg / denom, total_valid / denom, arcface_avg
+    triplet_avg = total_triplet / denom if use_triplet else 0.0
+    return (
+        total_loss / denom,
+        total_pos / denom,
+        total_neg / denom,
+        total_valid / denom,
+        arcface_avg,
+        triplet_avg,
+        total_gap / denom,
+        total_active / denom,
+    )
 
 
 def append_stats(path: str, row: Dict[str, float]) -> None:
@@ -218,8 +275,11 @@ def maybe_plot_metrics(csv_path: str, out_path: str) -> None:
     metrics: Dict[str, list] = {
         "train_loss": [],
         "train_arcface_loss": [],
+        "train_triplet_loss": [],
         "train_pos_dist": [],
         "train_neg_dist": [],
+        "train_margin_gap": [],
+        "train_active_triplets": [],
         "train_valid_frac": [],
     }
     with open(csv_path, "r", encoding="utf-8") as f:
@@ -251,12 +311,16 @@ def maybe_plot_metrics(csv_path: str, out_path: str) -> None:
 
     axes[1].plot(epochs, metrics["train_pos_dist"], marker="o", label="pos_dist")
     axes[1].plot(epochs, metrics["train_neg_dist"], marker="o", label="neg_dist")
+    if any(v == v for v in metrics["train_margin_gap"]):
+        axes[1].plot(epochs, metrics["train_margin_gap"], marker="o", label="neg_minus_pos")
     axes[1].set_title("distance stats")
     axes[1].set_ylabel("distance")
     axes[1].grid(True, alpha=0.3)
     axes[1].legend()
 
     axes[2].plot(epochs, metrics["train_valid_frac"], marker="o", label="valid_frac")
+    if any(v == v for v in metrics["train_active_triplets"]):
+        axes[2].plot(epochs, metrics["train_active_triplets"], marker="o", label="active_triplets")
     axes[2].set_title("valid fraction")
     axes[2].set_ylabel("fraction")
     axes[2].set_xlabel("epoch")
@@ -320,22 +384,34 @@ def main() -> None:
         use_length=cfg["data"]["use_length"],
         length_mean=float(length_mean),
         length_std=float(length_std),
-        rotate_by_direction=cfg["data"].get("rotate_by_direction", False),
+        rotate=cfg["data"].get("rotate", False),
+        crop=cfg["data"].get("crop", False),
+        normalize=cfg["data"].get("normalize", False),
         augment=cfg["data"].get("augment", True),
     )
     dataset = LabeledImageDataset(data_cfg)
+
+    loss_mode = cfg["train"].get("loss", "triplet")
+    use_triplet = loss_mode in ("triplet", "combined")
+    use_arcface = loss_mode in ("arcface", "combined")
 
     pk_cfg = cfg["data"].get("pk_sampler", {})
     use_pk = pk_cfg.get("enabled", True)
     if use_pk:
         p = pk_cfg.get("p", 16)
         k = pk_cfg.get("k", 4)
+        min_samples_per_id = int(pk_cfg.get("min_samples_per_id", 2 if use_triplet else 1))
         batch_sampler = PKBatchSampler(
             dataset.indices_by_id,
             p=p,
             k=k,
             batches_per_epoch=pk_cfg.get("batches_per_epoch"),
             seed=cfg["seed"],
+            min_samples_per_id=min_samples_per_id,
+        )
+        print(
+            f"PK sampler: p={p} k={k} min_samples_per_id={min_samples_per_id} "
+            f"eligible_ids={len(batch_sampler.boat_ids)} total_ids={len(dataset.indices_by_id)}"
         )
         loader = DataLoader(
             dataset,
@@ -362,10 +438,6 @@ def main() -> None:
         length_embed_dim=cfg["model"]["length_embed_dim"],
         pretrained=cfg["model"]["pretrained"],
     ).to(device)
-
-    loss_mode = cfg["train"].get("loss", "triplet")
-    use_triplet = loss_mode in ("triplet", "combined")
-    use_arcface = loss_mode in ("arcface", "combined")
     arcface_weight = float(cfg["train"].get("arcface_weight", 1.0))
     triplet_weight = float(cfg["train"].get("triplet_weight", 1.0))
 
@@ -393,7 +465,10 @@ def main() -> None:
         weight_decay=cfg["train"]["weight_decay"],
     )
     use_amp = device.type == "cuda"
-    scaler = GradScaler(enabled=use_amp)
+    scaler = torch.amp.GradScaler(device.type, enabled=use_amp)
+    triplet_warmup_epochs = int(cfg["train"].get("triplet_warmup_epochs", 0))
+    arcface_warmup_epochs = int(cfg["train"].get("arcface_warmup_epochs", 0))
+    grad_clip_norm = float(cfg["train"].get("grad_clip_norm", 0.0))
 
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     stats_csv = str(TRAIN_STATS_CSV)
@@ -404,33 +479,41 @@ def main() -> None:
     for epoch in range(cfg["train"]["epochs"]):
         if use_pk:
             loader.batch_sampler.set_epoch(epoch)
+        epoch_triplet_weight = resolve_loss_weight(triplet_weight, epoch, triplet_warmup_epochs)
+        epoch_arcface_weight = resolve_loss_weight(arcface_weight, epoch, arcface_warmup_epochs)
         loss = train_one_epoch(
             model,
             loader,
             optimizer,
             criterion,
             arcface_head,
-            arcface_weight,
-            triplet_weight,
             use_arcface,
             use_triplet,
             device,
             use_amp,
             cfg["train"]["log_every"],
             scaler,
+            epoch_triplet_weight,
+            epoch_arcface_weight,
+            grad_clip_norm,
         )
-        train_loss, pos_dist, neg_dist, valid_frac, arcface_loss = loss
+        train_loss, pos_dist, neg_dist, valid_frac, arcface_loss, triplet_loss, margin_gap, active_frac = loss
         print(
             f"epoch {epoch + 1}/{cfg['train']['epochs']}: "
-            f"loss {train_loss:.4f} arc {arcface_loss:.4f} pos {pos_dist:.3f} neg {neg_dist:.3f} valid {valid_frac:.2f}"
+            f"loss {train_loss:.4f} arc {arcface_loss:.4f} trip {triplet_loss:.4f} "
+            f"pos {pos_dist:.3f} neg {neg_dist:.3f} gap {margin_gap:.3f} active {active_frac:.2f} "
+            f"valid {valid_frac:.2f} w_trip {epoch_triplet_weight:.3f} w_arc {epoch_arcface_weight:.3f}"
         )
 
         row = {
             "epoch": epoch + 1,
             "train_loss": train_loss,
             "train_arcface_loss": arcface_loss,
+            "train_triplet_loss": triplet_loss,
             "train_pos_dist": pos_dist,
             "train_neg_dist": neg_dist,
+            "train_margin_gap": margin_gap,
+            "train_active_triplets": active_frac,
             "train_valid_frac": valid_frac,
         }
         history.append(row)

@@ -32,6 +32,7 @@ class DataConfig:
 def build_train_transforms(image_size: int) -> A.Compose:
     return A.Compose(
         [
+            A.Resize(image_size, image_size),
             A.GaussianBlur(blur_limit=(3, 5), p=0.2),
             A.RandomBrightnessContrast(p=0.2),
             A.HueSaturationValue(p=0.3),
@@ -200,14 +201,25 @@ class PKBatchSampler(Sampler[List[int]]):
         k: int,
         batches_per_epoch: Optional[int] = None,
         seed: int = 1337,
+        min_samples_per_id: int = 1,
     ) -> None:
-        self.indices_by_id = indices_by_id
+        self.indices_by_id = {
+            boat_id: idxs
+            for boat_id, idxs in indices_by_id.items()
+            if len(idxs) >= min_samples_per_id
+        }
         self.p = p
         self.k = k
         self.batches_per_epoch = batches_per_epoch
         self.seed = seed
-        self.boat_ids = list(indices_by_id.keys())
+        self.min_samples_per_id = min_samples_per_id
+        self.boat_ids = list(self.indices_by_id.keys())
         self._epoch = 0
+        if len(self.boat_ids) < self.p:
+            raise ValueError(
+                f"PKBatchSampler requires at least p={self.p} ids with >= {self.min_samples_per_id} samples, "
+                f"found {len(self.boat_ids)}"
+            )
 
     def __len__(self) -> int:
         if self.batches_per_epoch is not None:
