@@ -21,3 +21,8 @@ LUMINANCE_B = 0.1
 
 # Border cropping
 CROP_FRACTION = 0.6
+
+# Background normalization
+BG_VALUE = 128
+DILATION_KERNEL_SIZE = 3
+DILATION_ITERATIONS = 1

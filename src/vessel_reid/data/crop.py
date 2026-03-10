@@ -3,19 +3,16 @@ Proof-of-concept script for cropping images
 Intended as an intermediate step to make it easier to experiment with and adjust parameters
 Once this is satisfactory, the functionality should be integrated into the image augmentations rather than used on its own
 """
-
-import io
 import os
 from PIL import Image
 
 from . import data_utils
-
+from .config import CROP_FRACTION
 from vessel_reid.paths import (
     ROTATED_IMAGES_DIR as INPUT_DIR,
     CROPPED_IMAGES_DIR as OUTPUT_DIR
 )
 
-from .config import CROP_FRACTION
 
 def crop(image: Image.Image) -> Image.Image:
     """

@@ -13,6 +13,7 @@ data:
   length_std: 44.8894
   rotate: true
   crop: true
+  normalize: true
   augment: true
   pk_sampler:
     enabled: true

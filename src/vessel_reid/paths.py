@@ -22,6 +22,7 @@ VESSEL_EXCLUDED_DIR = REPO_ROOT / "data" / "images" / "vesselExcluded"
 
 ROTATED_IMAGES_DIR = REPO_ROOT / "data" / "images" / "rotated"
 CROPPED_IMAGES_DIR = REPO_ROOT / "data" / "images" / "cropped"
+NORMALIZED_IMAGES_DOR = REPO_ROOT / "data" / "images" / "normalized"
 
 # ---------------------------------------------------------------------------
 # data, metadata: csvs and other tracking files for data
