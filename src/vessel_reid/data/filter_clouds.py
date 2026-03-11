@@ -69,7 +69,10 @@ def get_cloud_coverage(image_path, csv_path, rows=None):
 
     coverage = compute_cloud_coverage(data)
     row = rows.get(filename, {"image_path": filename, "boat_id": "", "length_m": "", "heading": ""})
-    data_utils.upsert_row(csv_path, {**row, "cloud_coverage": coverage})
+    if csv_path is not None and rows is None:
+        data_utils.upsert_row(csv_path, {**row, "cloud_coverage": coverage})
+    else:
+        rows[filename] = {**row, "cloud_coverage": coverage}
 
     return coverage
 
@@ -123,6 +126,7 @@ if __name__ == "__main__":
     vessel_clean = defaultdict(list)   # mmsi -> [filename, ...]
     vessel_cloudy = defaultdict(list)  # mmsi -> [filename, ...]
 
+    BATCH_SIZE = 1000
     for filename in os.listdir(DATASET_PATH):
         mmsi = filename.split("_")[0]
         path = os.path.join(DATASET_PATH, filename)
@@ -134,8 +138,10 @@ if __name__ == "__main__":
         else:
             vessel_clean[mmsi].append(filename)
         total_images += 1
+        if total_images % BATCH_SIZE == 0:
+            data_utils.write_csv(MASTER_CSV_PATH, rows)
 
-    # Write all cached coverages to CSV in one pass
+    # Final write
     data_utils.write_csv(MASTER_CSV_PATH, rows)
 
     # Pass 2: enforce minimum threshold, then copy/delete
