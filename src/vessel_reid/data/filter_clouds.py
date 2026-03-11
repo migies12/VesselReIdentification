@@ -19,6 +19,7 @@ from . import data_utils
 from vessel_reid.paths import (
     RAW_IMAGES_DIR      as DATASET_PATH,
     RAW_METADATA_CSV    as MASTER_CSV_PATH,
+    FILTERED_METADATA_CSV as FILTERED_CSV_PATH,
     FILTERED_IMAGES_DIR as OUTPUT_PATH,
     CLOUDY_EXCLUDED_DIR as FILTERED_PATH,
     VESSEL_EXCLUDED_DIR as EXCLUDED_PATH,
@@ -145,6 +146,7 @@ if __name__ == "__main__":
     data_utils.write_csv(MASTER_CSV_PATH, rows)
 
     # Pass 2: enforce minimum threshold, then copy/delete
+    kept_filenames = []
     for mmsi in set(vessel_clean) | set(vessel_cloudy):
         clean = vessel_clean[mmsi]
         cloudy = vessel_cloudy[mmsi]
@@ -173,6 +175,11 @@ if __name__ == "__main__":
                 path = os.path.join(DATASET_PATH, filename)
                 if DRY_RUN:
                     shutil.copy2(path, OUTPUT_PATH / filename)
+                kept_filenames.append(filename)
+
+    filtered_rows = {f: rows[f] for f in kept_filenames if f in rows}
+    data_utils.write_csv(FILTERED_CSV_PATH, filtered_rows)
+    print(f"wrote filtered metadata to {FILTERED_CSV_PATH}")
 
     print(f"Removed {cloudy_images} cloudy images from {total_images} total images")
     print(f"Excluded {excluded_vessels} vessels ({excluded_images} images) that fell below {MIN_IMAGES_PER_VESSEL}-image threshold after cloud filtering")
