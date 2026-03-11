@@ -21,11 +21,11 @@ See `dataset/README.md` for the expected CSV format and folder structure.
 
 Generate splits:
 ```bash
-python -m vessel_reid.cli.split_ids --csv dataset/all_labels.csv --out-dir data
+python -m vessel_reid.cli.split_ids --csv data/all_labels.csv --out-dir data
 ```
 Or generate splits directly from image filenames:
 ```bash
-python -m vessel_reid.cli.split_ids --image-dir dataset/images --out-dir data
+python -m vessel_reid.cli.split_ids --image-dir data/images --out-dir data
 ```
 ## Commands
 Train:
