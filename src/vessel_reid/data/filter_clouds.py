@@ -19,7 +19,6 @@ from . import data_utils
 from vessel_reid.paths import (
     RAW_IMAGES_DIR      as DATASET_PATH,
     RAW_METADATA_CSV    as MASTER_CSV_PATH,
-    FILTERED_METADATA_CSV as FILTERED_CSV_PATH,
     FILTERED_IMAGES_DIR as OUTPUT_PATH,
     CLOUDY_EXCLUDED_DIR as FILTERED_PATH,
     VESSEL_EXCLUDED_DIR as EXCLUDED_PATH,
@@ -70,10 +69,7 @@ def get_cloud_coverage(image_path, csv_path, rows=None):
 
     coverage = compute_cloud_coverage(data)
     row = rows.get(filename, {"image_path": filename, "boat_id": "", "length_m": "", "heading": ""})
-    if csv_path is not None and rows is None:
-        data_utils.upsert_row(csv_path, {**row, "cloud_coverage": coverage})
-    else:
-        rows[filename] = {**row, "cloud_coverage": coverage}
+    data_utils.upsert_row(csv_path, {**row, "cloud_coverage": coverage})
 
     return coverage
 
@@ -127,7 +123,6 @@ if __name__ == "__main__":
     vessel_clean = defaultdict(list)   # mmsi -> [filename, ...]
     vessel_cloudy = defaultdict(list)  # mmsi -> [filename, ...]
 
-    BATCH_SIZE = 1000
     for filename in os.listdir(DATASET_PATH):
         mmsi = filename.split("_")[0]
         path = os.path.join(DATASET_PATH, filename)
@@ -139,14 +134,11 @@ if __name__ == "__main__":
         else:
             vessel_clean[mmsi].append(filename)
         total_images += 1
-        if total_images % BATCH_SIZE == 0:
-            data_utils.write_csv(MASTER_CSV_PATH, rows)
 
-    # Final write
+    # Write all cached coverages to CSV in one pass
     data_utils.write_csv(MASTER_CSV_PATH, rows)
 
     # Pass 2: enforce minimum threshold, then copy/delete
-    kept_filenames = []
     for mmsi in set(vessel_clean) | set(vessel_cloudy):
         clean = vessel_clean[mmsi]
         cloudy = vessel_cloudy[mmsi]
@@ -175,11 +167,6 @@ if __name__ == "__main__":
                 path = os.path.join(DATASET_PATH, filename)
                 if DRY_RUN:
                     shutil.copy2(path, OUTPUT_PATH / filename)
-                kept_filenames.append(filename)
-
-    filtered_rows = {f: rows[f] for f in kept_filenames if f in rows}
-    data_utils.write_csv(FILTERED_CSV_PATH, filtered_rows)
-    print(f"wrote filtered metadata to {FILTERED_CSV_PATH}")
 
     print(f"Removed {cloudy_images} cloudy images from {total_images} total images")
     print(f"Excluded {excluded_vessels} vessels ({excluded_images} images) that fell below {MIN_IMAGES_PER_VESSEL}-image threshold after cloud filtering")
