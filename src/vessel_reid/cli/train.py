@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn.functional as F
 
-from vessel_reid.data.dataset import DataConfig, LabeledImageDataset, PKBatchSampler
+from vessel_reid.model.dataset.dataset import DataConfig, LabeledImageDataset, PKBatchSampler
 from vessel_reid.models.reid_model import ReIDModel
 from vessel_reid.paths import (
     TRAIN_CSV,

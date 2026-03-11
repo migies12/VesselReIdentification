@@ -11,9 +11,9 @@ import torch
 from torch.utils.data import Dataset, Sampler
 from typing import Dict, List, Optional, Tuple
 
-from .crop import crop
-from .normalize import normalize_background
-from .rotate import rotate
+from vessel_reid.model.image_processing.crop import crop
+from vessel_reid.model.image_processing.normalize import normalize_background
+from vessel_reid.model.image_processing.rotate import rotate
 
 @dataclass
 class DataConfig:

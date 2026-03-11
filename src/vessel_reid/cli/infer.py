@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-from vessel_reid.data.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
+from vessel_reid.model.dataset.dataset import apply_transforms, build_eval_transforms, rotate_and_crop_by_heading
 from vessel_reid.models.reid_model import ReIDModel
 from vessel_reid.paths import MODEL_CHECKPOINT, FAISS_INDEX_PATH, FAISS_METADATA_PATH
 from vessel_reid.utils.config import load_config

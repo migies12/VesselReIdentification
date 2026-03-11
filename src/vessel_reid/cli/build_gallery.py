@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from vessel_reid.data.dataset import DataConfig, SingleImageDataset
+from vessel_reid.model.dataset.dataset import DataConfig, SingleImageDataset
 from vessel_reid.models.reid_model import ReIDModel
 from vessel_reid.paths import GALLERY_CSV, RAW_IMAGES_DIR, MODEL_CHECKPOINT, FAISS_INDEX_PATH, FAISS_METADATA_PATH, MODEL_DIR
 from vessel_reid.utils.config import load_config
