@@ -2,7 +2,7 @@
 DEFAULT_DATA_SOURCE = "es"
 
 # Vessel filtering
-MIN_IMAGES_PER_VESSEL = 3
+MIN_IMAGES_PER_VESSEL = 5
 
 # Data population / backfill
 BACKFILL_LOOKBACK_DAYS = 540
