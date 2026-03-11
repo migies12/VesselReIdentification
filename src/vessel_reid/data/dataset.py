@@ -1,18 +1,19 @@
-from collections import defaultdict
-import math
-import random
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
-
 import albumentations as A
+from albumentations.pytorch import ToTensorV2
+from collections import defaultdict
 import cv2
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
-import torch
-from albumentations.pytorch import ToTensorV2
 from PIL import Image
+import random
+import torch
 from torch.utils.data import Dataset, Sampler
+from typing import Dict, List, Optional, Tuple
 
+from .crop import crop
+from .normalize import normalize_background
+from .rotate import rotate
 
 @dataclass
 class DataConfig:
@@ -22,67 +23,17 @@ class DataConfig:
     use_length: bool
     length_mean: float
     length_std: float
-    rotate_by_direction: bool = False
+    rotate: bool = False
+    crop: bool = False
+    normalize: bool = False
     augment: bool = False
-
-
-def rotate_and_crop_by_heading(image: Image.Image, heading: float) -> Image.Image:
-    """
-    Rotate image to normalize vessel heading and crop to the largest inscribed square.
-
-    Args:
-        image: PIL Image to transform
-        heading: Vessel heading in degrees (0-360, where 0 is north)
-
-    Returns:
-        Rotated and cropped PIL Image
-    """
-    # Rotate image by negative heading to normalize all vessels to face north (0 degrees)
-    # expand=True keeps the full rotated image without clipping corners
-    rotated = image.rotate(-heading, resample=Image.BILINEAR, expand=True)
-
-    # Calculate the crop size: side / sqrt(2) ensures valid crop for any rotation
-    # Use the original image dimensions for the calculation
-    original_size = min(image.width, image.height)
-    crop_size = int(original_size / math.sqrt(2))
-
-    # Center crop the rotated image
-    center_x = rotated.width // 2
-    center_y = rotated.height // 2
-    half_crop = crop_size // 2
-
-    left = center_x - half_crop
-    top = center_y - half_crop
-    right = left + crop_size
-    bottom = top + crop_size
-
-    cropped = rotated.crop((left, top, right, bottom))
-    return cropped
 
 
 def build_train_transforms(image_size: int) -> A.Compose:
     return A.Compose(
         [
-            A.RandomResizedCrop(
-                size=(image_size, image_size),
-                scale=(0.85, 1.0),
-                ratio=(0.9, 1.1),
-                p=1.0,
-            ),
-            A.Rotate(limit=180, border_mode=cv2.BORDER_REFLECT_101, p=0.5),
-            A.ShiftScaleRotate(
-                shift_limit=0.05,
-                scale_limit=0.1,
-                rotate_limit=10,
-                border_mode=cv2.BORDER_REFLECT_101,
-                p=0.6,
-            ),
-            A.GaussianBlur(blur_limit=(3, 5), p=0.2),
-            A.RandomBrightnessContrast(p=0.5),
-            A.HueSaturationValue(p=0.3),
-            A.GaussNoise(p=0.3),
-            A.ImageCompression(p=0.3),
-            A.Downscale(p=0.3),
+            A.Rotate(limit=10, border_mode=cv2.BORDER_REFLECT_101, p=0.2),
+            A.RandomBrightnessContrast(brightness_limit=0.15, contrast_limit=0.15, p=0.4),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2(),
         ]
@@ -127,9 +78,15 @@ class TripletDataset(Dataset):
         image_path = f"{self.cfg.image_root}/{row['image_path']}"
         image = Image.open(image_path).convert("RGB")
 
-        if self.cfg.rotate_by_direction and pd.notna(row.get("heading")):
+        if self.cfg.rotate and pd.notna(row.get("heading")):
             heading = float(row["heading"])
-            image = rotate_and_crop_by_heading(image, heading)
+            image = rotate(image, heading)
+
+        if self.cfg.crop:
+            image = crop(image)
+
+        if self.cfg.normalize:
+            image = normalize_background(image)
 
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)
@@ -173,9 +130,15 @@ class SingleImageDataset(Dataset):
         image_path = f"{self.cfg.image_root}/{row['image_path']}"
         image = Image.open(image_path).convert("RGB")
 
-        if self.cfg.rotate_by_direction and pd.notna(row.get("heading")):
+        if self.cfg.rotate and pd.notna(row.get("heading")):
             heading = float(row["heading"])
-            image = rotate_and_crop_by_heading(image, heading)
+            image = rotate(image, heading)
+
+        if self.cfg.crop:
+            image = crop(image)
+
+        if self.cfg.normalize:
+            image = normalize_background(image)
 
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)
@@ -207,9 +170,15 @@ class LabeledImageDataset(Dataset):
         image_path = f"{self.cfg.image_root}/{row['image_path']}"
         image = Image.open(image_path).convert("RGB")
 
-        if self.cfg.rotate_by_direction and pd.notna(row.get("heading")):
+        if self.cfg.rotate and pd.notna(row.get("heading")):
             heading = float(row["heading"])
-            image = rotate_and_crop_by_heading(image, heading)
+            image = rotate(image, heading)
+
+        if self.cfg.crop:
+            image = crop(image)
+
+        if self.cfg.normalize:
+            image = normalize_background(image)
 
         image = apply_transforms(image, self.transform)
         length_tensor = torch.zeros(1, dtype=torch.float32)

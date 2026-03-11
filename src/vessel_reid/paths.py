@@ -20,6 +20,10 @@ FILTERED_IMAGES_DIR = REPO_ROOT / "data" / "images" / "filtered"
 CLOUDY_EXCLUDED_DIR = REPO_ROOT / "data" / "images" / "cloudyExcluded"
 VESSEL_EXCLUDED_DIR = REPO_ROOT / "data" / "images" / "vesselExcluded"
 
+ROTATED_IMAGES_DIR = REPO_ROOT / "data" / "images" / "rotated"
+CROPPED_IMAGES_DIR = REPO_ROOT / "data" / "images" / "cropped"
+NORMALIZED_IMAGES_DOR = REPO_ROOT / "data" / "images" / "normalized"
+
 # ---------------------------------------------------------------------------
 # data, metadata: csvs and other tracking files for data
 # ---------------------------------------------------------------------------
@@ -33,7 +37,7 @@ FETCHED_EVENT_IDS_PATH = METADATA_DIR / "eventIds.txt"
 # dataset splits: csvs used by training/gallery/inference
 # ---------------------------------------------------------------------------
 
-DATASET_DIR = REPO_ROOT / "dataset"
+DATASET_DIR = REPO_ROOT / "data"
 TRAIN_CSV   = DATASET_DIR / "train.csv"
 VAL_CSV     = DATASET_DIR / "val.csv"
 GALLERY_CSV = DATASET_DIR / "gallery.csv"
