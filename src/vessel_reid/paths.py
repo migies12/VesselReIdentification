@@ -37,7 +37,7 @@ FETCHED_EVENT_IDS_PATH = METADATA_DIR / "eventIds.txt"
 # dataset splits: csvs used by training/gallery/inference
 # ---------------------------------------------------------------------------
 
-DATASET_DIR = REPO_ROOT / "dataset"
+DATASET_DIR = REPO_ROOT / "data"
 TRAIN_CSV   = DATASET_DIR / "train.csv"
 VAL_CSV     = DATASET_DIR / "val.csv"
 GALLERY_CSV = DATASET_DIR / "gallery.csv"

@@ -320,8 +320,10 @@ def main() -> None:
         use_length=cfg["data"]["use_length"],
         length_mean=float(length_mean),
         length_std=float(length_std),
-        rotate_by_direction=cfg["data"].get("rotate_by_direction", False),
+        rotate=cfg["data"].get("rotate", False),
         augment=cfg["data"].get("augment", True),
+        crop=cfg["data"].get("crop", False),
+        normalize=cfg["data"].get("normalize", False),
     )
     dataset = LabeledImageDataset(data_cfg)
 
