@@ -7,10 +7,8 @@ This function uses thresholds for brightness and saturation that can be adjusted
 trial and error and manual inspection, and the results are moderately successful
 """
 
-from collections import defaultdict
-import os
+import pandas as pd
 from pathlib import Path
-import shutil
 
 import numpy as np
 import rasterio
@@ -19,14 +17,11 @@ from . import data_utils
 from vessel_reid.paths import (
     RAW_IMAGES_DIR      as DATASET_PATH,
     RAW_METADATA_CSV    as MASTER_CSV_PATH,
-    FILTERED_IMAGES_DIR as OUTPUT_PATH,
-    CLOUDY_EXCLUDED_DIR as FILTERED_PATH,
-    VESSEL_EXCLUDED_DIR as EXCLUDED_PATH,
+    FILTERED_METADATA_CSV as FILTERED_CSV_PATH
 )
 
 from .config import (
     MIN_IMAGES_PER_VESSEL,
-    DRY_RUN,
     BRIGHTNESS_THRESHOLD,
     SATURATION_THRESHOLD,
     COVERAGE_THRESHOLD,
@@ -44,51 +39,19 @@ def compute_cloud_coverage(data):
     return float(np.sum(cloud_mask) / cloud_mask.size)
 
 
-def is_cloudy(data):
-    return compute_cloud_coverage(data) > COVERAGE_THRESHOLD
-
-
-def get_cloud_coverage(image_path, csv_path, rows=None):
-    """
-    Returns the cloud coverage fraction for the image at image_path.
-    Checks csv_path for a cached value first; computes and caches if not found.
-    Optionally accepts an already-loaded rows dict to avoid re-reading the CSV.
-    """
-    filename = Path(image_path).name
-    if rows is None:
-        rows = data_utils.load_csv(csv_path)
-
-    cached = rows.get(filename, {}).get("cloud_coverage", "")
-    if cached != "":
-        return float(cached)
-
-    with rasterio.open(image_path) as img:
-        if img.count < 3:
-            return 0.0
-        data = img.read([1, 2, 3])
-
-    coverage = compute_cloud_coverage(data)
-    row = rows.get(filename, {"image_path": filename, "boat_id": "", "length_m": "", "heading": ""})
-    data_utils.upsert_row(csv_path, {**row, "cloud_coverage": coverage})
-
-    return coverage
-
-
 ########################## Standalone Script ##########################
 
-def is_cloudy_filepath(image_path, csv_path=None):
+def cloud_coverage_filepath(image_path):
     """
     Same as `is_cloudy_bytes`, but operates on the filepath of a downloaded image.
     For use in the below script, if cloud filtering occurs AFTER data fetch.
     If csv_path is provided, uses cached cloud coverage from the CSV if available.
     """
-    if csv_path is not None:
-        return get_cloud_coverage(image_path, csv_path) > COVERAGE_THRESHOLD
     with rasterio.open(image_path) as img:
         if img.count < 3:
             return False
         data = img.read([1, 2, 3]).astype(float)
-    return is_cloudy(data)
+    return compute_cloud_coverage(data)
 
 
 def is_cloudy_bytes(image_bytes):
@@ -103,71 +66,34 @@ def is_cloudy_bytes(image_bytes):
                 return True
             data = img.read([1, 2, 3]).astype(float)
 
-    return is_cloudy(data)
+    return compute_cloud_coverage(data)
 
 
 if __name__ == "__main__":
-    total_images = 0
-    cloudy_images = 0
-    excluded_vessels = 0
-    excluded_images = 0
+    print("Finding non-cloudy images...")
 
-    data_utils.setup_dryrun_folder(OUTPUT_PATH)
-    data_utils.setup_dryrun_folder(FILTERED_PATH)
-    data_utils.setup_dryrun_folder(EXCLUDED_PATH)
+    df = pd.read_csv(MASTER_CSV_PATH)
+    total_images = len(df)
 
-    # Load CSV cache once for the whole run
-    rows = data_utils.load_csv(MASTER_CSV_PATH)
+    def process_row(row):
+        img_path = DATASET_PATH / row["image_path"]
+        if img_path.exists():
+            return cloud_coverage_filepath(img_path)
+        return 1.0
+    
+    df["cloud_coverage"] = df.apply(process_row, axis=1)
 
-    # Pass 1: group images by vessel and classify each as cloudy or clean
-    vessel_clean = defaultdict(list)   # mmsi -> [filename, ...]
-    vessel_cloudy = defaultdict(list)  # mmsi -> [filename, ...]
+    df = df[df["cloud_coverage"] <= COVERAGE_THRESHOLD].copy()
+    cloudy_images = total_images - len(df)
+    non_cloudy_images = len(df)
+    print(f"Removed {cloudy_images} cloudy images of {total_images} total images")
 
-    for filename in os.listdir(DATASET_PATH):
-        mmsi = filename.split("_")[0]
-        path = os.path.join(DATASET_PATH, filename)
-        coverage = get_cloud_coverage(path, MASTER_CSV_PATH, rows=rows)
-        rows.setdefault(filename, {"image_path": filename, "boat_id": mmsi, "length_m": "", "heading": ""})
-        rows[filename]["cloud_coverage"] = coverage
-        if coverage > COVERAGE_THRESHOLD:
-            vessel_cloudy[mmsi].append(filename)
-        else:
-            vessel_clean[mmsi].append(filename)
-        total_images += 1
+    vessel_counts = df.groupby("boat_id")["image_path"].transform("count")
+    df = df[vessel_counts >= MIN_IMAGES_PER_VESSEL].copy()
+    final_count = len(df)
+    not_enough_instances_count = non_cloudy_images - final_count
+    print(f"Eliminated {not_enough_instances_count} images because less than {MIN_IMAGES_PER_VESSEL} images of that vessel")
+    print(f"Writing {final_count} images to output csv")
 
-    # Write all cached coverages to CSV in one pass
-    data_utils.write_csv(MASTER_CSV_PATH, rows)
-
-    # Pass 2: enforce minimum threshold, then copy/delete
-    for mmsi in set(vessel_clean) | set(vessel_cloudy):
-        clean = vessel_clean[mmsi]
-        cloudy = vessel_cloudy[mmsi]
-
-        if len(clean) < MIN_IMAGES_PER_VESSEL:
-            # Too few clean images remain after cloud filtering — exclude entire vessel
-            print(f"Excluding vessel {mmsi}: only {len(clean)} clean images after cloud filtering (need {MIN_IMAGES_PER_VESSEL})")
-            excluded_vessels += 1
-            excluded_images += len(clean) + len(cloudy)
-            for filename in clean + cloudy:
-                path = os.path.join(DATASET_PATH, filename)
-                if not DRY_RUN:
-                    os.remove(path)
-                else:
-                    shutil.copy2(path, EXCLUDED_PATH / filename)
-        else:
-            for filename in cloudy:
-                path = os.path.join(DATASET_PATH, filename)
-                print(f"Removing {filename}: Too cloudy")
-                cloudy_images += 1
-                if not DRY_RUN:
-                    os.remove(path)
-                else:
-                    shutil.copy2(path, FILTERED_PATH / filename)
-            for filename in clean:
-                path = os.path.join(DATASET_PATH, filename)
-                if DRY_RUN:
-                    shutil.copy2(path, OUTPUT_PATH / filename)
-
-    print(f"Removed {cloudy_images} cloudy images from {total_images} total images")
-    print(f"Excluded {excluded_vessels} vessels ({excluded_images} images) that fell below {MIN_IMAGES_PER_VESSEL}-image threshold after cloud filtering")
-    print(f"{total_images - cloudy_images - excluded_images} images remaining")
+    df = df.drop(columns=["cloud_coverage"])
+    df.to_csv(FILTERED_CSV_PATH, index=False)
