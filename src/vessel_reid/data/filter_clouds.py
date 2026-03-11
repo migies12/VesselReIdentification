@@ -7,13 +7,10 @@ This function uses thresholds for brightness and saturation that can be adjusted
 trial and error and manual inspection, and the results are moderately successful
 """
 
-import pandas as pd
-from pathlib import Path
-
 import numpy as np
+import pandas as pd
 import rasterio
 
-from . import data_utils
 from vessel_reid.paths import (
     RAW_IMAGES_DIR      as DATASET_PATH,
     RAW_METADATA_CSV    as MASTER_CSV_PATH,
