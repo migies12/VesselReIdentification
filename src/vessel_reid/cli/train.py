@@ -2,14 +2,15 @@ import argparse
 import csv
 import json
 import os
+from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import torch
 from torch import nn
-from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn.functional as F
+from torch.amp import GradScaler, autocast
 
 from vessel_reid.data.dataset import DataConfig, LabeledImageDataset, PKBatchSampler
 from vessel_reid.models.reid_model import ReIDModel
@@ -21,6 +22,7 @@ from vessel_reid.paths import (
     TRAIN_STATS_JSON,
     LOSS_CURVE_PNG,
     MODEL_DIR,
+    REPO_ROOT,
 )
 from vessel_reid.utils.config import load_config
 from vessel_reid.utils.seed import seed_everything
@@ -45,11 +47,32 @@ def move_batch(batch: Tuple, device: torch.device):
 
 
 class BatchHardTripletLoss(nn.Module):
-    def __init__(self, margin: float = 0.3, distance: str = "cosine", softplus: bool = True) -> None:
+    def __init__(
+        self,
+        margin: float = 0.3,
+        distance: str = "cosine",
+        softplus: bool = True,
+        hardest_k: int = 1,
+    ) -> None:
         super().__init__()
         self.margin = margin
         self.distance = distance
         self.softplus = softplus
+        self.hardest_k = max(int(hardest_k), 1)
+
+    def _masked_topk_mean(
+        self,
+        dist: torch.Tensor,
+        mask: torch.Tensor,
+        *,
+        largest: bool,
+    ) -> torch.Tensor:
+        fill_value = -torch.inf if largest else torch.inf
+        masked = dist.masked_fill(~mask, fill_value)
+        k = min(self.hardest_k, masked.size(1))
+        selected = torch.topk(masked, k=k, dim=1, largest=largest).values
+        valid = torch.isfinite(selected)
+        return selected.masked_fill(~valid, 0.0).sum(dim=1) / valid.sum(dim=1).clamp_min(1)
 
     def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, float]]:
         n = embeddings.size(0)
@@ -74,13 +97,8 @@ class BatchHardTripletLoss(nn.Module):
         mask_pos.fill_diagonal_(False)
         mask_neg = labels.ne(labels.t())
 
-        pos_dist = dist.clone()
-        pos_dist[~mask_pos] = -1e9
-        hardest_pos, _ = pos_dist.max(dim=1)
-
-        neg_dist = dist.clone()
-        neg_dist[~mask_neg] = 1e9
-        hardest_neg, _ = neg_dist.min(dim=1)
+        hardest_pos = self._masked_topk_mean(dist, mask_pos, largest=True)
+        hardest_neg = self._masked_topk_mean(dist, mask_neg, largest=False)
 
         valid = (mask_pos.sum(dim=1) > 0) & (mask_neg.sum(dim=1) > 0)
         if valid.any():
@@ -134,6 +152,7 @@ def train_one_epoch(
     use_amp: bool,
     log_every: int,
     scaler: GradScaler,
+    grad_clip_norm: float,
 ) -> Tuple[float, float, float, float, float]:
     model.train()
     if use_arcface and arcface_head is None:
@@ -145,10 +164,9 @@ def train_one_epoch(
     total_arcface = 0.0
     for step, batch in enumerate(tqdm(loader, desc="train", leave=False)):
         images, lengths, labels = move_batch(batch, device)
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
 
-        # Mixed precision forward pass
-        with autocast(enabled=use_amp):
+        with autocast(device_type=device.type, enabled=use_amp):
             embeddings = model(images, lengths)
             triplet_loss = torch.tensor(0.0, device=device)
             stats = {"pos_dist": 0.0, "neg_dist": 0.0, "valid_frac": 0.0}
@@ -167,8 +185,12 @@ def train_one_epoch(
             else:
                 loss = triplet_weight * triplet_loss
 
-        # Mixed precision backward pass
         scaler.scale(loss).backward()
+        if grad_clip_norm > 0.0:
+            scaler.unscale_(optimizer)
+            params = [param for group in optimizer.param_groups for param in group["params"] if param.grad is not None]
+            if params:
+                nn.utils.clip_grad_norm_(params, grad_clip_norm)
         scaler.step(optimizer)
         scaler.update()
 
@@ -300,22 +322,59 @@ def compute_length_stats(csv_path: str) -> Tuple[float, float, int]:
     return mean, std, count
 
 
+def resolve_repo_path(path_value: Optional[str], default: Path) -> Path:
+    if not path_value:
+        return default
+    path = Path(path_value).expanduser()
+    if path.is_absolute():
+        return path
+    return (REPO_ROOT / path).resolve()
+
+
+def summarize_identities(dataset: LabeledImageDataset) -> Dict[str, float]:
+    counts = sorted(len(indices) for indices in dataset.indices_by_id.values())
+    if not counts:
+        raise ValueError("training dataset is empty")
+    count = len(counts)
+    midpoint = count // 2
+    median = counts[midpoint] if count % 2 == 1 else 0.5 * (counts[midpoint - 1] + counts[midpoint])
+    return {
+        "ids": float(count),
+        "singletons": float(sum(v == 1 for v in counts)),
+        "max_count": float(counts[-1]),
+        "mean_count": float(sum(counts) / count),
+        "median_count": float(median),
+    }
+
+
+def scheduled_weight(base_weight: float, start_epoch: int, ramp_epochs: int, epoch: int) -> float:
+    if base_weight <= 0.0 or epoch < start_epoch:
+        return 0.0
+    if ramp_epochs <= 0:
+        return base_weight
+    progress = min(float(epoch - start_epoch + 1) / float(ramp_epochs), 1.0)
+    return base_weight * progress
+
+
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
     seed_everything(cfg["seed"])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    train_csv = resolve_repo_path(cfg["data"].get("train_csv"), TRAIN_CSV)
+    image_root = resolve_repo_path(cfg["data"].get("image_root"), RAW_IMAGES_DIR)
+    print(f"training data: csv={train_csv} image_root={image_root}")
 
     length_mean = cfg["data"].get("length_mean")
     length_std = cfg["data"].get("length_std")
     if cfg["data"]["use_length"] and cfg["data"].get("compute_length_stats", False):
-        length_mean, length_std, count = compute_length_stats(str(TRAIN_CSV))
+        length_mean, length_std, count = compute_length_stats(str(train_csv))
         print(f"computed length stats from train.csv: mean={length_mean:.4f} std={length_std:.4f} count={count}")
 
     data_cfg = DataConfig(
-        csv_path=str(TRAIN_CSV),
-        image_root=str(RAW_IMAGES_DIR),
+        csv_path=str(train_csv),
+        image_root=str(image_root),
         image_size=cfg["data"]["image_size"],
         use_length=cfg["data"]["use_length"],
         length_mean=float(length_mean),
@@ -324,14 +383,35 @@ def main() -> None:
         augment=cfg["data"].get("augment", True),
         crop=cfg["data"].get("crop", False),
         normalize=cfg["data"].get("normalize", False),
+        augmentation=cfg["data"].get("augmentation"),
     )
     dataset = LabeledImageDataset(data_cfg)
+    id_stats = summarize_identities(dataset)
+    print(
+        "train identity stats: "
+        f"ids={int(id_stats['ids'])} "
+        f"singletons={int(id_stats['singletons'])} "
+        f"mean={id_stats['mean_count']:.2f} "
+        f"median={id_stats['median_count']:.1f} "
+        f"max={int(id_stats['max_count'])}"
+    )
+    if id_stats["singletons"] > 0:
+        print(
+            f"warning: {int(id_stats['singletons'])} identities only have one image; "
+            "their positives come from repeated augmented views of the same source image"
+        )
 
     pk_cfg = cfg["data"].get("pk_sampler", {})
     use_pk = pk_cfg.get("enabled", True)
     if use_pk:
         p = pk_cfg.get("p", 16)
         k = pk_cfg.get("k", 4)
+        small_ids = sum(len(indices) < k for indices in dataset.indices_by_id.values())
+        if small_ids:
+            print(
+                f"warning: {small_ids} identities have fewer than k={k} images; "
+                "PK sampling will repeat images within those classes"
+            )
         batch_sampler = PKBatchSampler(
             dataset.indices_by_id,
             p=p,
@@ -370,12 +450,16 @@ def main() -> None:
     use_arcface = loss_mode in ("arcface", "combined")
     arcface_weight = float(cfg["train"].get("arcface_weight", 1.0))
     triplet_weight = float(cfg["train"].get("triplet_weight", 1.0))
+    arcface_start_epoch = int(cfg["train"].get("arcface_start_epoch", 0))
+    arcface_ramp_epochs = int(cfg["train"].get("arcface_ramp_epochs", 0))
+    grad_clip_norm = float(cfg["train"].get("grad_clip_norm", 0.0))
 
     triplet_cfg = cfg["train"].get("triplet", {})
     criterion = BatchHardTripletLoss(
         margin=float(triplet_cfg.get("margin", cfg["train"]["margin"])),
         distance=str(triplet_cfg.get("distance", "cosine")),
         softplus=bool(triplet_cfg.get("softplus", True)),
+        hardest_k=int(triplet_cfg.get("hardest_k", 1)),
     )
     arcface_head = None
     if use_arcface:
@@ -395,7 +479,7 @@ def main() -> None:
         weight_decay=cfg["train"]["weight_decay"],
     )
     use_amp = device.type == "cuda"
-    scaler = GradScaler(enabled=use_amp)
+    scaler = GradScaler(device.type, enabled=use_amp)
 
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     stats_csv = str(TRAIN_STATS_CSV)
@@ -406,25 +490,38 @@ def main() -> None:
     for epoch in range(cfg["train"]["epochs"]):
         if use_pk:
             loader.batch_sampler.set_epoch(epoch)
+        if loss_mode == "combined":
+            current_arcface_weight = scheduled_weight(
+                arcface_weight,
+                arcface_start_epoch,
+                arcface_ramp_epochs,
+                epoch,
+            )
+            arcface_enabled = use_arcface and current_arcface_weight > 0.0
+        else:
+            current_arcface_weight = arcface_weight
+            arcface_enabled = use_arcface
         loss = train_one_epoch(
             model,
             loader,
             optimizer,
             criterion,
             arcface_head,
-            arcface_weight,
+            current_arcface_weight,
             triplet_weight,
-            use_arcface,
+            arcface_enabled,
             use_triplet,
             device,
             use_amp,
             cfg["train"]["log_every"],
             scaler,
+            grad_clip_norm,
         )
         train_loss, pos_dist, neg_dist, valid_frac, arcface_loss = loss
         print(
             f"epoch {epoch + 1}/{cfg['train']['epochs']}: "
-            f"loss {train_loss:.4f} arc {arcface_loss:.4f} pos {pos_dist:.3f} neg {neg_dist:.3f} valid {valid_frac:.2f}"
+            f"loss {train_loss:.4f} arc {arcface_loss:.4f} arc_w {current_arcface_weight:.3f} "
+            f"pos {pos_dist:.3f} neg {neg_dist:.3f} valid {valid_frac:.2f}"
         )
 
         row = {

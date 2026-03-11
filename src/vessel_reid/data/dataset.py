@@ -9,7 +9,7 @@ from PIL import Image
 import random
 import torch
 from torch.utils.data import Dataset, Sampler
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .crop import crop
 from .normalize import normalize_background
@@ -27,13 +27,40 @@ class DataConfig:
     crop: bool = False
     normalize: bool = False
     augment: bool = False
+    augmentation: Optional[Dict[str, Any]] = None
 
+def build_train_transforms(image_size: int, cfg: Optional[Dict[str, Any]] = None) -> A.Compose:
+    cfg = cfg or {}
+    brightness_limit = float(cfg.get("brightness_limit", 0.12))
+    contrast_limit = float(cfg.get("contrast_limit", 0.12))
+    shift_limit = float(cfg.get("shift_limit", 0.04))
+    scale_limit = float(cfg.get("scale_limit", 0.08))
+    rotate_limit = int(cfg.get("rotate_limit", 7))
 
-def build_train_transforms(image_size: int) -> A.Compose:
     return A.Compose(
         [
-            A.Rotate(limit=10, border_mode=cv2.BORDER_REFLECT_101, p=0.2),
-            A.RandomBrightnessContrast(brightness_limit=0.15, contrast_limit=0.15, p=0.4),
+            A.Resize(image_size, image_size),
+            A.ShiftScaleRotate(
+                shift_limit=shift_limit,
+                scale_limit=scale_limit,
+                rotate_limit=rotate_limit,
+                border_mode=cv2.BORDER_REFLECT_101,
+                p=0.5,
+            ),
+            A.RandomBrightnessContrast(
+                brightness_limit=brightness_limit,
+                contrast_limit=contrast_limit,
+                p=0.4,
+            ),
+            A.OneOf(
+                [
+                    A.GaussianBlur(blur_limit=(3, 5), p=1.0),
+                    A.MotionBlur(blur_limit=3, p=1.0),
+                    A.GaussNoise(p=1.0),
+                    A.ImageCompression(p=1.0),
+                ],
+                p=0.35,
+            ),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2(),
         ]
@@ -64,7 +91,11 @@ class TripletDataset(Dataset):
     def __init__(self, cfg: DataConfig):
         self.cfg = cfg
         self.df = pd.read_csv(cfg.csv_path)
-        self.transform = build_train_transforms(cfg.image_size) if cfg.augment else build_eval_transforms(cfg.image_size)
+        self.transform = (
+            build_train_transforms(cfg.image_size, cfg.augmentation)
+            if cfg.augment
+            else build_eval_transforms(cfg.image_size)
+        )
         self.indices_by_id: Dict[str, List[int]] = defaultdict(list)
         for idx, boat_id in enumerate(self.df["boat_id"].astype(str).tolist()):
             self.indices_by_id[boat_id].append(idx)
@@ -155,7 +186,11 @@ class LabeledImageDataset(Dataset):
     def __init__(self, cfg: DataConfig):
         self.cfg = cfg
         self.df = pd.read_csv(cfg.csv_path)
-        self.transform = build_train_transforms(cfg.image_size) if cfg.augment else build_eval_transforms(cfg.image_size)
+        self.transform = (
+            build_train_transforms(cfg.image_size, cfg.augmentation)
+            if cfg.augment
+            else build_eval_transforms(cfg.image_size)
+        )
         self.indices_by_id: Dict[str, List[int]] = defaultdict(list)
         for idx, boat_id in enumerate(self.df["boat_id"].astype(str).tolist()):
             self.indices_by_id[boat_id].append(idx)

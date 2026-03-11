@@ -15,10 +15,16 @@ data:
   crop: true
   normalize: true
   augment: true
+  augmentation:
+    rotate_limit: 7
+    shift_limit: 0.04
+    scale_limit: 0.08
+    brightness_limit: 0.12
+    contrast_limit: 0.12
   pk_sampler:
     enabled: true
-    p: 8
-    k: 8
+    p: 16
+    k: 4
     batches_per_epoch: 1000
 
 model:
@@ -35,11 +41,15 @@ train:
   margin: 0.3
   loss: combined
   triplet_weight: 2.0
+  arcface_start_epoch: 2
+  arcface_ramp_epochs: 5
+  grad_clip_norm: 5.0
   triplet:
     distance: cosine
     margin: 0.2
     softplus: true
+    hardest_k: 2
   arcface_margin: 0.5
   arcface_scale: 30.0
-  arcface_weight: 0.5
+  arcface_weight: 0.1
   log_every: 50
