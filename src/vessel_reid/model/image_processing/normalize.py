@@ -4,8 +4,8 @@ import os
 from PIL import Image
 from sklearn.cluster import KMeans
 
-from .config import BG_VALUE, DILATION_KERNEL_SIZE, DILATION_ITERATIONS
-from . import data_utils
+from vessel_reid.data.config import BG_VALUE, DILATION_KERNEL_SIZE, DILATION_ITERATIONS
+from vessel_reid.data import data_utils
 from vessel_reid.paths import (
     CROPPED_IMAGES_DIR as INPUT_DIR,
     NORMALIZED_IMAGES_DOR as OUTPUT_DIR

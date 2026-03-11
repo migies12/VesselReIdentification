@@ -6,8 +6,8 @@ Once this is satisfactory, the functionality should be integrated into the image
 import os
 from PIL import Image
 
-from . import data_utils
-from .config import CROP_FRACTION
+from vessel_reid.data import data_utils
+from vessel_reid.data.config import CROP_FRACTION
 from vessel_reid.paths import (
     ROTATED_IMAGES_DIR as INPUT_DIR,
     CROPPED_IMAGES_DIR as OUTPUT_DIR

@@ -4,7 +4,7 @@ from pathlib import Path
 from PIL import Image
 import os
 
-from . import data_utils
+from vessel_reid.data import data_utils
 from vessel_reid.paths import (
     FILTERED_IMAGES_DIR as INPUT_DIR,
     ROTATED_IMAGES_DIR as OUTPUT_DIR,
