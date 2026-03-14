@@ -29,6 +29,8 @@ node_modules/
 *.db
 badData/*
 oldDataPreMar04/*
+kmeans_output/
+normalize_output/
 src/vessel_reid/api/dryrun_excluded_vessels/*
 src/vessel_reid/api/dryrun_deleted_images/*
 src/vessel_reid/api/dryrun_filtered_images/*
