@@ -74,3 +74,100 @@ def compute_map(
         average_precisions.append(average_precision)
 
     return float(np.mean(average_precisions)) if average_precisions else 0.0
+
+
+def compute_f1_at_threshold(
+    similarity_matrix: np.ndarray,
+    query_ids: np.ndarray,
+    gallery_ids: np.ndarray,
+    threshold: float,
+) -> dict:
+    """
+    compute a bunch of helpful metrics for comparing different models: 
+    precision, recall, F1, FPR, and FNR at a given similarity threshold
+
+    query-gallery pair above threshold counts as predicted match
+
+    Args:
+        similarity_matrix: shape (num_queries, num_gallery), higher = more similar
+        query_ids: shape (num_queries,)
+        gallery_ids: shape (num_gallery,)
+        threshold: minimum similarity to accept a match
+
+    gives dict with: precision, recall, f1, fpr, fnr, tp, fp, fn, tn
+    """
+    tp = fp = fn = tn = 0
+
+    for i in range(len(query_ids)):
+        for j in range(len(gallery_ids)):
+            predicted_match = similarity_matrix[i, j] >= threshold
+            actual_match = query_ids[i] == gallery_ids[j]
+
+            if predicted_match and actual_match:
+                tp += 1
+            elif predicted_match and not actual_match:
+                fp += 1
+            elif not predicted_match and actual_match:
+                fn += 1
+            else:
+                tn += 1
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
+    fnr = fn / (fn + tp) if (fn + tp) > 0 else 0.0
+
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "fpr": fpr,
+        "fnr": fnr,
+        "tp": tp,
+        "fp": fp,
+        "fn": fn,
+        "tn": tn,
+    }
+
+
+def find_optimal_threshold(
+    similarity_matrix: np.ndarray,
+    query_ids: np.ndarray,
+    gallery_ids: np.ndarray,
+    max_fpr: float = 0.01,
+    step: float = 0.01,
+) -> dict:
+    """
+    tries a bunch of thresholds to find lowest theshold where fpr is at or below max 
+    goes high to low 
+    this will help us prioritize avoiding false positives, and only accept confident matches 
+
+    if no threshold has fpr <= max fpr, returns threshold with lowest fpr
+
+    args:
+        similarity_matrix: shape (num_queries, num_gallery), higher = more similar
+        query_ids: shape (num_queries,)
+        gallery_ids: shape (num_gallery,)
+        max_fpr: max acceptable false positive rate  (fpr) (default 0.01)
+        step: threshold increment to sweep (default 0.01)
+
+    returns dict w threshold, precision, recall, f1, fpr, fnr
+    """
+    thresholds = np.arange(1.0, 0.0 - step, -step)
+    best = None
+
+    best_valid = None   # best threshold satisfying max fpr constraint
+    best_fallback = None  # lowest fpr seen if constraint never good
+
+    for t in thresholds:
+        t = round(float(t), 4)
+        metrics = compute_f1_at_threshold(similarity_matrix, query_ids, gallery_ids, t)
+        entry = {"threshold": t, **{k: metrics[k] for k in ("precision", "recall", "f1", "fpr", "fnr")}}
+        if metrics["fpr"] <= max_fpr:
+            # keep going lower to maximise recall while fpr stays acceptable
+            best_valid = entry
+        elif best_fallback is None or metrics["fpr"] < best_fallback["fpr"]:
+            best_fallback = entry
+
+    return best_valid if best_valid is not None else best_fallback
