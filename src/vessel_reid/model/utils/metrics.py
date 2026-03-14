@@ -171,3 +171,80 @@ def find_optimal_threshold(
             best_fallback = entry
 
     return best_valid if best_valid is not None else best_fallback
+
+
+def compute_confidence_margin(
+    similarity_matrix: np.ndarray,
+    query_ids: np.ndarray,
+    gallery_ids: np.ndarray,
+) -> float:
+    """
+    mean diff btwn confidence of top correct match + top wrong match for each inference run 
+    higher means model is more decisive + better at differentiating. 
+    queries with no correct matches are skipped -- maybe we should change this? unsure of how it will imapct
+
+    Args:
+        similarity_matrix: shape (num_queries, num_gallery), higher = more similar
+        query_ids: shape (num_queries,)
+        gallery_ids: shape (num_gallery,)
+
+    Returns:
+    returns mean confidence margin across all queries. 
+    Should be positive. Will only be negative if its rlly bad and we are matching non-matches more than real matches
+    """
+    margins = []
+    for i in range(len(query_ids)):
+        sims = similarity_matrix[i]
+        correct_mask = gallery_ids == query_ids[i]
+        wrong_mask = ~correct_mask
+
+        if not correct_mask.any() or not wrong_mask.any():
+            continue
+
+        top_correct = sims[correct_mask].max()
+        top_wrong = sims[wrong_mask].max()
+        margins.append(float(top_correct - top_wrong))
+
+    return float(np.mean(margins)) if margins else 0.0
+
+
+def compute_separation(
+    similarity_matrix: np.ndarray,
+    query_ids: np.ndarray,
+    gallery_ids: np.ndarray,
+) -> dict:
+    """
+    inside vs outside class similarity across embedding. 
+    intra-class (inside): mean similarity btwn a query + correct matches
+    inter-class (outside): mean similarity btwn query + wrong matches
+    separation ratio: intra / inter --> higher is better, wanna get this well over 1 if possible
+
+    Args:
+        similarity_matrix: shape (num_queries, num_gallery), higher = more similar
+        query_ids: shape (num_queries,)
+        gallery_ids: shape (num_gallery,)
+
+    returns dict with intra_class, inter_class, separation_ratio
+    """
+    intra_sims = []
+    inter_sims = []
+
+    for i in range(len(query_ids)):
+        sims = similarity_matrix[i]
+        correct_mask = gallery_ids == query_ids[i]
+        wrong_mask = ~correct_mask
+
+        if correct_mask.any():
+            intra_sims.extend(sims[correct_mask].tolist())
+        if wrong_mask.any():
+            inter_sims.extend(sims[wrong_mask].tolist())
+
+    intra = float(np.mean(intra_sims)) if intra_sims else 0.0
+    inter = float(np.mean(inter_sims)) if inter_sims else 0.0
+    ratio = intra / inter if inter > 0 else 0.0
+
+    return {
+        "intra_class": intra,
+        "inter_class": inter,
+        "separation_ratio": ratio,
+    }
