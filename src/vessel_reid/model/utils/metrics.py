@@ -248,3 +248,22 @@ def compute_separation(
         "inter_class": inter,
         "separation_ratio": ratio,
     }
+
+
+def compute_aggregate_score(metrics: dict, weights: dict = None) -> float:
+    """
+    compute single score that ranks models in order to do sweep 
+    combines rank, map, and f1 score with weighted sum. 
+    weights are configurable, will do more research + ask hunter to know what they want
+
+    default weights for now: rank1=0.5, map=0.3, f1=0.2
+
+    Args:
+        metrics: dict containing at minimum "rank1", "map", "f1"
+        weights: optional dict overriding default weights
+
+    returns agg score which is 0-1
+    """
+    default_weights = {"rank1": 0.5, "map": 0.3, "f1": 0.2}
+    w = {**default_weights, **(weights or {})}
+    return w["rank1"] * metrics["rank1"] + w["map"] * metrics["map"] + w["f1"] * metrics["f1"]
