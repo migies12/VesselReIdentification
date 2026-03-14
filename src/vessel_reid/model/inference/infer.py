@@ -8,7 +8,7 @@ from vessel_reid.model.dataset.dataset import apply_transforms, build_eval_trans
 from vessel_reid.model.models.reid_model import ReIDModel
 from vessel_reid.paths import MODEL_CHECKPOINT, FAISS_INDEX_PATH, FAISS_METADATA_PATH
 from vessel_reid.utils.config import load_config
-from vessel_reid.utils.faiss_index import load_index, load_metadata, search
+from vessel_reid.model.inference.faiss_index import load_index, load_metadata, search
 
 
 def parse_args() -> argparse.Namespace:
