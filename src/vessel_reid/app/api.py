@@ -14,7 +14,7 @@ import os
 import torch
 
 from ..paths import FAISS_INDEX_PATH, FAISS_METADATA_PATH, RAW_IMAGES_DIR
-from ..utils.config import load_config
+from ..model.utils.config import load_config
 from . import utils
 
 app = Flask(

@@ -9,7 +9,7 @@ from tqdm import tqdm
 from vessel_reid.model.dataset.dataset import DataConfig, SingleImageDataset
 from vessel_reid.model.models.reid_model import ReIDModel
 from vessel_reid.paths import GALLERY_CSV, RAW_IMAGES_DIR, MODEL_CHECKPOINT, FAISS_INDEX_PATH, FAISS_METADATA_PATH, MODEL_DIR
-from vessel_reid.utils.config import load_config
+from vessel_reid.model.utils.config import load_config
 from vessel_reid.model.inference.faiss_index import build_index, save_index, save_metadata
 
 

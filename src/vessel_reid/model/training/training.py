@@ -22,8 +22,8 @@ from vessel_reid.paths import (
     LOSS_CURVE_PNG,
     MODEL_DIR,
 )
-from vessel_reid.utils.config import load_config
-from vessel_reid.utils.seed import seed_everything
+from vessel_reid.model.utils.config import load_config
+from vessel_reid.model.utils.seed import seed_everything
 
 
 def parse_args() -> argparse.Namespace:
