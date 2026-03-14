@@ -36,3 +36,41 @@ def compute_rankk_accuracy(
         if query_ids[i] in top_k_ids:
             correct += 1
     return correct / num_queries
+
+
+def compute_map(
+    similarity_matrix: np.ndarray,
+    query_ids: np.ndarray,
+    gallery_ids: np.ndarray,
+) -> float:
+    """
+    mean avg precision: for each query, do avg precision over
+    the ranked gallery list, then avg across queries
+
+    Args:
+        similarity_matrix: shape (num_queries, num_gallery), higher = more similar
+        query_ids: shape (num_queries,)
+        gallery_ids: shape (num_gallery,)
+
+    returns map score, which is 0-1
+    """
+    num_queries = similarity_matrix.shape[0]
+    average_precisions = []
+
+    for i in range(num_queries):
+        sorted_indices = np.argsort(similarity_matrix[i])[::-1]
+        sorted_gallery_ids = gallery_ids[sorted_indices]
+        relevant = (sorted_gallery_ids == query_ids[i])
+        num_relevant = relevant.sum()
+
+        if num_relevant == 0:
+            continue
+
+        # precision at each rank where correct match is found
+        cumulative_correct = np.cumsum(relevant)
+        ranks = np.arange(1, len(sorted_gallery_ids) + 1)
+        precision_at_k = cumulative_correct / ranks
+        average_precision = (precision_at_k * relevant).sum() / num_relevant
+        average_precisions.append(average_precision)
+
+    return float(np.mean(average_precisions)) if average_precisions else 0.0
