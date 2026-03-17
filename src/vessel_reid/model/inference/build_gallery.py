@@ -1,5 +1,6 @@
 import argparse
 import os
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -19,19 +20,22 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-    cfg = load_config(args.config)
-
+def build_gallery(cfg: dict, run_dir: Path) -> None:
+    """
+    encodes gallery images and saves faiss index + metadata to run_dir.
+    cfg must have gallery.csv_path + gallery.image_root set.
+    loads model from run_dir/reid_model.pt.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    g = cfg["gallery"]
     data_cfg = DataConfig(
-        csv_path=str(GALLERY_CSV),
-        image_root=str(RAW_IMAGES_DIR),
-        image_size=cfg["gallery"]["image_size"],
-        use_length=cfg["gallery"]["use_length"],
-        length_mean=cfg["gallery"]["length_mean"],
-        length_std=cfg["gallery"]["length_std"],
+        csv_path=g["csv_path"],
+        image_root=g["image_root"],
+        image_size=g["image_size"],
+        use_length=g["use_length"],
+        length_mean=g["length_mean"],
+        length_std=g["length_std"],
     )
     dataset = SingleImageDataset(data_cfg)
     loader = DataLoader(dataset, batch_size=64, shuffle=False, num_workers=4)
@@ -43,7 +47,7 @@ def main() -> None:
         length_embed_dim=cfg["model"]["length_embed_dim"],
         pretrained=False,
     ).to(device)
-    state = torch.load(str(MODEL_CHECKPOINT), map_location=device)
+    state = torch.load(str(run_dir / "reid_model.pt"), map_location=device)
     model.load_state_dict(state)
     model.eval()
 
@@ -70,12 +74,24 @@ def main() -> None:
     embeddings = np.concatenate(all_embeddings, axis=0)
     index = build_index(embeddings, normalize=cfg["faiss"]["normalize"])
 
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    save_index(index, str(FAISS_INDEX_PATH))
-    save_metadata(metadata, str(FAISS_METADATA_PATH))
+    run_dir.mkdir(parents=True, exist_ok=True)
+    index_path = run_dir / "gallery.index"
+    meta_path = run_dir / "gallery_metadata.json"
+    save_index(index, str(index_path))
+    save_metadata(metadata, str(meta_path))
 
-    print(f"saved index to {FAISS_INDEX_PATH}")
-    print(f"saved metadata to {FAISS_METADATA_PATH}")
+    print(f"saved index to {index_path}")
+    print(f"saved metadata to {meta_path}")
+
+
+def main() -> None:
+    args = parse_args()
+    cfg = load_config(args.config)
+    # inject paths for standalone use -- sweep runner injects its own
+    cfg["gallery"].setdefault("csv_path", str(GALLERY_CSV))
+    cfg["gallery"].setdefault("image_root", str(RAW_IMAGES_DIR))
+    run_dir = Path(MODEL_DIR)
+    build_gallery(cfg, run_dir)
 
 
 if __name__ == "__main__":
