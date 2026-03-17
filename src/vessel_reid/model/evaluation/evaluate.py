@@ -1,3 +1,4 @@
+import argparse
 import json
 from pathlib import Path
 
@@ -9,6 +10,8 @@ from tqdm import tqdm
 from vessel_reid.model.dataset.dataset import DataConfig, SingleImageDataset
 from vessel_reid.model.inference.faiss_index import load_index, load_metadata
 from vessel_reid.model.models.reid_model import ReIDModel
+from vessel_reid.model.utils.config import load_config
+from vessel_reid import paths
 from vessel_reid.model.utils.metrics import (
     compute_rankk_accuracy,
     compute_map,
@@ -154,3 +157,26 @@ def evaluate(
         })
 
     return metrics
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="evaluate a trained model")
+    parser.add_argument("--config", required=True, help="path to eval config YAML")
+    parser.add_argument("--run-dir", required=True, help="directory with reid_model.pt + gallery files")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    cfg = load_config(args.config)
+
+    cfg.setdefault("query", {})
+    cfg["query"].setdefault("csv_path", str(paths.QUERY_CSV))
+    cfg["query"].setdefault("image_root", str(paths.RAW_IMAGES_DIR))
+
+    metrics = evaluate(cfg, Path(args.run_dir))
+    print(json.dumps(metrics, indent=2))
+
+
+if __name__ == "__main__":
+    main()
