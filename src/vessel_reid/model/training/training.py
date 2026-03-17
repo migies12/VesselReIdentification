@@ -2,6 +2,7 @@ import argparse
 import csv
 import json
 import os
+from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import torch
@@ -359,22 +360,24 @@ def build_model(
     return model, arcface_head
 
 
-def main() -> None:
-    args = parse_args()
-    cfg = load_config(args.config)
+def train(cfg: dict, run_dir: Path, wandb_run=None) -> dict:
+    """
+    main training callable. cfg must have data.csv_path + data.image_root set.
+    saves checkpoint + stats to run_dir. returns final epoch stats.
+    pass None to skip wandb logging.
+    """
     seed_everything(cfg["seed"])
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     length_mean = cfg["data"].get("length_mean")
     length_std = cfg["data"].get("length_std")
     if cfg["data"]["use_length"] and cfg["data"].get("compute_length_stats", False):
-        length_mean, length_std, count = compute_length_stats(str(TRAIN_CSV))
-        print(f"computed length stats from train.csv: mean={length_mean:.4f} std={length_std:.4f} count={count}")
+        length_mean, length_std, count = compute_length_stats(cfg["data"]["csv_path"])
+        print(f"computed length stats: mean={length_mean:.4f} std={length_std:.4f} count={count}")
 
     data_cfg = DataConfig(
-        csv_path=str(TRAIN_CSV),
-        image_root=str(RAW_IMAGES_DIR),
+        csv_path=cfg["data"]["csv_path"],
+        image_root=cfg["data"]["image_root"],
         image_size=cfg["data"]["image_size"],
         use_length=cfg["data"]["use_length"],
         length_mean=float(length_mean),
@@ -385,44 +388,9 @@ def main() -> None:
         normalize=cfg["data"].get("normalize", False),
     )
     dataset = LabeledImageDataset(data_cfg)
+    loader = build_loader(cfg, dataset)
 
-    pk_cfg = cfg["data"].get("pk_sampler", {})
-    use_pk = pk_cfg.get("enabled", True)
-    if use_pk:
-        p = pk_cfg.get("p", 16)
-        k = pk_cfg.get("k", 4)
-        batch_sampler = PKBatchSampler(
-            dataset.indices_by_id,
-            p=p,
-            k=k,
-            batches_per_epoch=pk_cfg.get("batches_per_epoch"),
-            seed=cfg["seed"],
-        )
-        loader = DataLoader(
-            dataset,
-            batch_sampler=batch_sampler,
-            num_workers=cfg["data"]["num_workers"],
-            pin_memory=True,
-            persistent_workers=True if cfg["data"]["num_workers"] > 0 else False,
-        )
-    else:
-        loader = DataLoader(
-            dataset,
-            batch_size=cfg["data"]["batch_size"],
-            shuffle=True,
-            num_workers=cfg["data"]["num_workers"],
-            pin_memory=True,
-            persistent_workers=True if cfg["data"]["num_workers"] > 0 else False,
-            drop_last=True,
-        )
-
-    model = ReIDModel(
-        backbone=cfg["model"]["backbone"],
-        embedding_dim=cfg["model"]["embedding_dim"],
-        use_length=cfg["model"]["use_length"],
-        length_embed_dim=cfg["model"]["length_embed_dim"],
-        pretrained=cfg["model"]["pretrained"],
-    ).to(device)
+    model, arcface_head = build_model(cfg, num_classes=len(dataset.id_to_index), device=device)
 
     loss_mode = cfg["train"].get("loss", "triplet")
     use_triplet = loss_mode in ("triplet", "combined")
@@ -436,14 +404,6 @@ def main() -> None:
         distance=str(triplet_cfg.get("distance", "cosine")),
         softplus=bool(triplet_cfg.get("softplus", True)),
     )
-    arcface_head = None
-    if use_arcface:
-        arcface_head = ArcFaceHead(
-            embedding_dim=cfg["model"]["embedding_dim"],
-            num_classes=len(dataset.id_to_index),
-            scale=float(cfg["train"].get("arcface_scale", 30.0)),
-            margin=float(cfg["train"].get("arcface_margin", 0.5)),
-        ).to(device)
 
     params = list(model.parameters())
     if use_arcface:
@@ -456,10 +416,11 @@ def main() -> None:
     use_amp = device.type == "cuda"
     scaler = GradScaler(enabled=use_amp)
 
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    stats_csv = str(TRAIN_STATS_CSV)
-    stats_json = str(TRAIN_STATS_JSON)
-    stats_plot = str(LOSS_CURVE_PNG)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    stats_csv = str(run_dir / "train_stats.csv")
+    stats_json = str(run_dir / "train_stats.json")
+    stats_plot = str(run_dir / "loss_curve.png")
+    use_pk = cfg["data"].get("pk_sampler", {}).get("enabled", True)
     history = []
 
     for epoch in range(cfg["train"]["epochs"]):
@@ -499,8 +460,24 @@ def main() -> None:
         save_stats_json(stats_json, history)
         maybe_plot_metrics(stats_csv, stats_plot)
 
-    torch.save(model.state_dict(), str(MODEL_CHECKPOINT))
-    print(f"saved model to {MODEL_CHECKPOINT}")
+        if wandb_run is not None:
+            wandb_run.log(row, step=epoch + 1)
+
+    checkpoint = run_dir / "reid_model.pt"
+    torch.save(model.state_dict(), str(checkpoint))
+    print(f"saved model to {checkpoint}")
+
+    return history[-1] if history else {}
+
+
+def main() -> None:
+    args = parse_args()
+    cfg = load_config(args.config)
+    # inject paths for standalone use -- sweep runner injects its own
+    cfg["data"].setdefault("csv_path", str(TRAIN_CSV))
+    cfg["data"].setdefault("image_root", str(RAW_IMAGES_DIR))
+    run_dir = Path(MODEL_DIR)
+    train(cfg, run_dir)
 
 
 if __name__ == "__main__":
