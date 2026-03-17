@@ -331,6 +331,34 @@ def build_loader(cfg: dict, dataset: LabeledImageDataset) -> DataLoader:
         )
 
 
+def build_model(
+    cfg: dict,
+    num_classes: int,
+    device: torch.device,
+) -> Tuple[ReIDModel, Optional[ArcFaceHead]]:
+    """builds model + arcface head (if needed) from cfg"""
+    model = ReIDModel(
+        backbone=cfg["model"]["backbone"],
+        embedding_dim=cfg["model"]["embedding_dim"],
+        use_length=cfg["model"]["use_length"],
+        length_embed_dim=cfg["model"]["length_embed_dim"],
+        pretrained=cfg["model"]["pretrained"],
+    ).to(device)
+
+    loss_mode = cfg["train"].get("loss", "triplet")
+    use_arcface = loss_mode in ("arcface", "combined")
+    arcface_head = None
+    if use_arcface:
+        arcface_head = ArcFaceHead(
+            embedding_dim=cfg["model"]["embedding_dim"],
+            num_classes=num_classes,
+            scale=float(cfg["train"].get("arcface_scale", 30.0)),
+            margin=float(cfg["train"].get("arcface_margin", 0.5)),
+        ).to(device)
+
+    return model, arcface_head
+
+
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
