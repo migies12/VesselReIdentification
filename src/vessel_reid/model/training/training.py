@@ -300,6 +300,37 @@ def compute_length_stats(csv_path: str) -> Tuple[float, float, int]:
     return mean, std, count
 
 
+def build_loader(cfg: dict, dataset: LabeledImageDataset) -> DataLoader:
+    """build the DataLoader, using PK sampler if enabled in cfg"""
+    pk_cfg = cfg["data"].get("pk_sampler", {})
+    use_pk = pk_cfg.get("enabled", True)
+    if use_pk:
+        batch_sampler = PKBatchSampler(
+            dataset.indices_by_id,
+            p=pk_cfg.get("p", 16),
+            k=pk_cfg.get("k", 4),
+            batches_per_epoch=pk_cfg.get("batches_per_epoch"),
+            seed=cfg["seed"],
+        )
+        return DataLoader(
+            dataset,
+            batch_sampler=batch_sampler,
+            num_workers=cfg["data"]["num_workers"],
+            pin_memory=True,
+            persistent_workers=cfg["data"]["num_workers"] > 0,
+        )
+    else:
+        return DataLoader(
+            dataset,
+            batch_size=cfg["data"]["batch_size"],
+            shuffle=True,
+            num_workers=cfg["data"]["num_workers"],
+            pin_memory=True,
+            persistent_workers=cfg["data"]["num_workers"] > 0,
+            drop_last=True,
+        )
+
+
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
