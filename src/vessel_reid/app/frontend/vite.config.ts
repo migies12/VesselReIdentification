@@ -5,8 +5,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/events": "http://localhost:5001",
-      "/gallery-image": "http://localhost:5001",
+      "/api": {
+        target: "http://localhost:5001",
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 });
