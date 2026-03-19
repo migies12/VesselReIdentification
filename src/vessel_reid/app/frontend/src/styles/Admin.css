@@ -1,0 +1,96 @@
+.admin-form-group {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  margin-top: 12px;
+  height: 50px;
+}
+
+.admin-input {
+  flex: 1;
+  padding: 0 16px;
+  background: #0f1117;
+  border: 1px solid #2d3748;
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-family: inherit;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.admin-input:focus {
+  outline: none;
+  border-color: #3182ce;
+  box-shadow: 0 0 0 1px #3182ce;
+}
+
+.admin-form-group .btn-reid {
+  padding: 0 32px;
+  border-radius: 8px;
+  font-size: 1rem;
+  white-space: nowrap;
+  height: 100%;
+}
+
+.full-width-panel {
+  grid-column: 1 / -1;
+  padding: 40px !important;
+}
+
+.admin-help-text {
+  font-size: 0.95rem;
+  color: #718096;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.admin-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #1a202c;
+  border: 1px solid #2d3748;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.admin-list-item:hover {
+  background: #232a37;
+}
+
+.admin-list-id {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.85rem;
+  color: #a0aec0;
+  
+  word-break: break-all; 
+  padding-right: 20px;
+  flex: 1;
+}
+
+.btn-danger {
+  background: #c53030 !important;
+  border: 1px solid #9b2c2c !important;
+  color: white !important;
+  font-weight: 600;
+  
+  border-radius: 8px !important; 
+  padding: 8px 20px !important;
+  font-size: 0.875rem;
+  
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.btn-danger:hover {
+  background: #e53e3e !important;
+}

@@ -15,7 +15,7 @@ import torch
 
 from ..paths import FAISS_INDEX_PATH, FAISS_METADATA_PATH, RAW_IMAGES_DIR
 from ..utils.config import load_config
-from . import utils
+from . import db, utils
 
 app = Flask(
     __name__,
@@ -41,15 +41,7 @@ model = utils.load_model(cfg, device, os.path.join(os.path.dirname(__file__), "m
 # In-memory event cache
 _events_cache = {}
 
-@app.route("/")
-def home():
-    # Serve React app if built, otherwise show API status
-    index_path = os.path.join(app_dir, "frontend", "dist", "index.html")
-    if os.path.exists(index_path):
-        return send_from_directory(os.path.join(app_dir, "frontend", "dist"), "index.html")
-    return "<h2>Vessel Reidentification API</h2>"
-
-@app.route("/events", methods=["GET"])
+@app.route("/api/events", methods=["GET"])
 def get_events():
     """Fetch recent Sentinel-2 vessel detection events from the Skylight API."""
     global _events_cache
@@ -70,27 +62,52 @@ def get_events():
     except Exception as e:
         return jsonify({"error": f"Failed to fetch events: {str(e)}"}), 500
     
-@app.route("/events/<event_id>/", methods=["GET"])
+@app.route("/api/events/demo", methods=["GET"])
+def get_demo_events():
+    global _events_cache
+    event_ids = db.get_demo_events()
+    events = []
+    for eid in event_ids:
+        full_event = utils.get_event_by_id(eid)
+        normalized = utils.format_event_helper(full_event)
+        
+        _events_cache[eid] = normalized
+        events.append(normalized)
+        
+    return jsonify(events), 200
+
+@app.route("/api/events/demo/add/<event_id>", methods=["POST"])
+def add_demo_event(event_id):
+    """
+    Add a demo event by ID to the stored list of demo events
+    """
+    db.add_demo_event(event_id)
+    return {"status": "success", "event_id": event_id}, 201
+
+@app.route("/api/events/demo/remove/<path:event_id>", methods=["DELETE"])
+def remove_demo_event(event_id):
+    db.remove_demo_event(event_id)
+    return {"status": "success"}, 200
+
+@app.route("/api/events/<path:event_id>/", methods=["GET"])
 def event(event_id):
     """
     Fetch a specific event from Skylight by event id
     """
     return utils.get_event_by_id(event_id)
 
-
-@app.route("/gallery-image/<path:image_path>")
+@app.route("/api/gallery-image/<path:image_path>")
 def gallery_image(image_path):
     """Serve a gallery image from the dataset images directory."""
     image_root = str(RAW_IMAGES_DIR)
     return send_from_directory(image_root, image_path)
 
-
-@app.route("/events/<event_id>/infer", methods=["POST"])
+@app.route("/api/events/<event_id>/infer", methods=["POST"])
 def infer(event_id):
     """Download the image for a cached event and run inference on it."""
     if event_id not in _events_cache:
         return jsonify({"error": "Event not found. Fetch /events first."}), 404
-
+    
     try:
         event = _events_cache[event_id]
         img_data, img_b64 = utils.download_image(event["image_url"])

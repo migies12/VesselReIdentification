@@ -1,0 +1,23 @@
+/* ── Home component styles ─────────────────────────────────── */
+.menu-container {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  min-height: 60vh;
+  grid-template-columns: none !important;
+}
+
+.btn-large {
+  width: 350px;
+  padding: 24px !important;
+  font-size: 1.1rem !important;
+  text-align: center;
+  text-decoration: none;
+}
+
+.btn-secondary {
+  background: #4a5568 !important;
+  border-color: #718096 !important;
+}
