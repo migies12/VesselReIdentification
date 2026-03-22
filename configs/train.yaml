@@ -14,7 +14,7 @@ data:
   rotate: true
   crop: true
   normalize: true
-  augment: true
+  augment: false
   pk_sampler:
     enabled: true
     p: 8

@@ -1,0 +1,12 @@
+nohup: ignoring input
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/mnt/disks/sdb/VesselReIdentification/src/vessel_reid/data/populate_elastic.py", line 74, in <module>
+    run(days=ES_FETCH_DAYS)
+  File "/mnt/disks/sdb/VesselReIdentification/src/vessel_reid/data/populate_elastic.py", line 20, in run
+    all_events = api_helper_elastic.get_events_from_elasticsearch(days=days)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/disks/sdb/VesselReIdentification/src/vessel_reid/data/api_helper_elastic.py", line 43, in get_events_from_elasticsearch
+    raise ValueError("ES authentication not configured. Set ES_USERNAME/ES_PASSWORD or ES_API_KEY")
+ValueError: ES authentication not configured. Set ES_USERNAME/ES_PASSWORD or ES_API_KEY
