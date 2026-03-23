@@ -81,9 +81,10 @@ def compute_f1_at_threshold(
     query_ids: np.ndarray,
     gallery_ids: np.ndarray,
     threshold: float,
+    actual_match: np.ndarray = None,
 ) -> dict:
     """
-    compute a bunch of helpful metrics for comparing different models: 
+    compute a bunch of helpful metrics for comparing different models:
     precision, recall, F1, FPR, and FNR at a given similarity threshold
 
     query-gallery pair above threshold counts as predicted match
@@ -93,24 +94,19 @@ def compute_f1_at_threshold(
         query_ids: shape (num_queries,)
         gallery_ids: shape (num_gallery,)
         threshold: minimum similarity to accept a match
+        actual_match: precomputed boolean matrix (num_queries, num_gallery) — pass this
+            when calling repeatedly to avoid recomputing it each time
 
     gives dict with: precision, recall, f1, fpr, fnr, tp, fp, fn, tn
     """
-    tp = fp = fn = tn = 0
+    predicted_match = similarity_matrix >= threshold
+    if actual_match is None:
+        actual_match = query_ids[:, None] == gallery_ids[None, :]
 
-    for i in range(len(query_ids)):
-        for j in range(len(gallery_ids)):
-            predicted_match = similarity_matrix[i, j] >= threshold
-            actual_match = query_ids[i] == gallery_ids[j]
-
-            if predicted_match and actual_match:
-                tp += 1
-            elif predicted_match and not actual_match:
-                fp += 1
-            elif not predicted_match and actual_match:
-                fn += 1
-            else:
-                tn += 1
+    tp = int((predicted_match & actual_match).sum())
+    fp = int((predicted_match & ~actual_match).sum())
+    fn = int((~predicted_match & actual_match).sum())
+    tn = int((~predicted_match & ~actual_match).sum())
 
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
@@ -155,14 +151,16 @@ def find_optimal_threshold(
     returns dict w threshold, precision, recall, f1, fpr, fnr
     """
     thresholds = np.arange(1.0, 0.0 - step, -step)
-    best = None
+
+    # precompute once — reused across all threshold iterations
+    actual_match = query_ids[:, None] == gallery_ids[None, :]
 
     best_valid = None   # best threshold satisfying max fpr constraint
-    best_fallback = None  # lowest fpr seen if constraint never good
+    best_fallback = None  # lowest fpr seen if constraint never satisfied
 
     for t in thresholds:
         t = round(float(t), 4)
-        metrics = compute_f1_at_threshold(similarity_matrix, query_ids, gallery_ids, t)
+        metrics = compute_f1_at_threshold(similarity_matrix, query_ids, gallery_ids, t, actual_match)
         entry = {"threshold": t, **{k: metrics[k] for k in ("precision", "recall", "f1", "fpr", "fnr")}}
         if metrics["fpr"] <= max_fpr:
             # keep going lower to maximise recall while fpr stays acceptable
