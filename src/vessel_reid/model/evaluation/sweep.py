@@ -23,6 +23,7 @@ PARAM_TO_CFG = {
     "p":              "data.pk_sampler.p",
     "k":              "data.pk_sampler.k",
     "crop":           "data.crop",
+    "crop_fraction":  "data.crop_fraction",
     "normalize":      "data.normalize",
     "use_length":     "model.use_length",
 }

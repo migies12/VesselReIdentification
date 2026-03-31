@@ -25,6 +25,7 @@ class DataConfig:
     length_std: float
     rotate: bool = False
     crop: bool = False
+    crop_fraction: float = 0.6
     normalize: bool = False
     augment: bool = False
 
@@ -83,7 +84,7 @@ class TripletDataset(Dataset):
             image = rotate(image, heading)
 
         if self.cfg.crop:
-            image = crop(image)
+            image = crop(image, self.cfg.crop_fraction)
 
         if self.cfg.normalize:
             image = normalize_background(image)
@@ -135,7 +136,7 @@ class SingleImageDataset(Dataset):
             image = rotate(image, heading)
 
         if self.cfg.crop:
-            image = crop(image)
+            image = crop(image, self.cfg.crop_fraction)
 
         if self.cfg.normalize:
             image = normalize_background(image)
@@ -175,7 +176,7 @@ class LabeledImageDataset(Dataset):
             image = rotate(image, heading)
 
         if self.cfg.crop:
-            image = crop(image)
+            image = crop(image, self.cfg.crop_fraction)
 
         if self.cfg.normalize:
             image = normalize_background(image)

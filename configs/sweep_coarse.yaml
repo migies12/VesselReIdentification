@@ -61,7 +61,7 @@ eval:
   max_fpr: 0.01
 
 sweep:
-  # coarse phase: 15 epochs per trial, 40 trials max, stop if no improvement in 12
+  # coarse phase: 25 epochs per trial, 25 trials max
   # goal: identify which loss type, lr range, and sampling settings matter most
   # after this, use sweep_fine.yaml with narrower ranges around the best params
-  sweep_epochs: 15
+  sweep_epochs: 25

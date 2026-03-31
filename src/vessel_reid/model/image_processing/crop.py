@@ -14,13 +14,13 @@ from vessel_reid.paths import (
 )
 
 
-def crop(image: Image.Image) -> Image.Image:
+def crop(image: Image.Image, crop_fraction: float = CROP_FRACTION) -> Image.Image:
     """
-    Crops the outer CROP_FRACTION of the image
-    Returns bytes of the cropped image
+    Crops the outer crop_fraction of the image (crop_fraction/2 from each side).
+    Returns the cropped image.
     """
     w, h = image.size
-    crop_margin = int(min(w, h) * CROP_FRACTION / 2)
+    crop_margin = int(min(w, h) * crop_fraction / 2)
 
     cropped = image.crop((
         crop_margin,

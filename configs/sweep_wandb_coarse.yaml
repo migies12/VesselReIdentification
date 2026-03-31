@@ -26,6 +26,10 @@ parameters:
     values: [4, 8]
   crop:
     values: [true, false]
+  crop_fraction:
+    distribution: uniform
+    min: 0.1
+    max: 0.6
   normalize:
     values: [true, false]
   use_length:
