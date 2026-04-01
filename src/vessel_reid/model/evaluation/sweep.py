@@ -20,6 +20,8 @@ PARAM_TO_CFG = {
     "arcface_margin": "train.arcface_margin",
     "arcface_scale":  "train.arcface_scale",
     "loss":           "train.loss",
+    "triplet_weight": "train.triplet_weight",
+    "arcface_weight": "train.arcface_weight",
     "p":              "data.pk_sampler.p",
     "k":              "data.pk_sampler.k",
     "crop":           "data.crop",
