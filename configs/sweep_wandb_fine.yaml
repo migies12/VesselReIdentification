@@ -20,6 +20,8 @@ parameters:
     values: [15, 30]
   loss:
     values: ["triplet", "combined"]
+  rotate:
+    values: [true, false]
   triplet_weight:
     distribution: uniform
     min: 0.5

@@ -24,6 +24,7 @@ PARAM_TO_CFG = {
     "arcface_weight": "train.arcface_weight",
     "p":              "data.pk_sampler.p",
     "k":              "data.pk_sampler.k",
+    "rotate":         "data.rotate",
     "crop":           "data.crop",
     "crop_fraction":  "data.crop_fraction",
     "normalize":      "data.normalize",
