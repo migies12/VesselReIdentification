@@ -48,7 +48,7 @@ QUERY_CSV   = DATASET_DIR / "query.csv"
 # ---------------------------------------------------------------------------
 
 MODEL_DIR           = REPO_ROOT / "model"
-MODEL_CHECKPOINT    = MODEL_DIR / "reid_model.pt"
+MODEL_CHECKPOINT    = "saved_models/best_model_filtered.pt"
 FAISS_INDEX_PATH    = MODEL_DIR / "gallery.index"
 FAISS_METADATA_PATH = MODEL_DIR / "gallery_metadata.json"
 TRAIN_STATS_CSV     = MODEL_DIR / "train_stats.csv"

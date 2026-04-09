@@ -47,7 +47,7 @@ def build_gallery(cfg: dict, run_dir: Path) -> None:
         length_embed_dim=cfg["model"]["length_embed_dim"],
         pretrained=False,
     ).to(device)
-    state = torch.load(str(run_dir / "reid_model.pt"), map_location=device)
+    state = torch.load(MODEL_CHECKPOINT, map_location=device)
     model.load_state_dict(state)
     model.eval()
 

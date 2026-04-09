@@ -17,7 +17,7 @@ from vessel_reid.paths import (
     FILTERED_METADATA_CSV as FILTERED_CSV_PATH
 )
 
-from .config import (
+from vessel_reid.data.config import (
     MIN_IMAGES_PER_VESSEL,
     BRIGHTNESS_THRESHOLD,
     SATURATION_THRESHOLD,
