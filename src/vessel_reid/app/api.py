@@ -51,7 +51,7 @@ def get_events():
         if _events_cache and not force_refresh:
             return jsonify(list(_events_cache.values())), 200
 
-        events = utils.fetch_skylight_events(days=1)
+        events = utils.fetch_skylight_events(days=10)
 
         _events_cache = {}
         for event in events:
@@ -121,16 +121,30 @@ def infer(event_id):
 
         top_k_results_with_image_url = []
         for result in top_k_results["all_results"]:
-            result_event_id_parts = result["image_path"].split("_", 1)[1].rsplit(".", 1)[0].rsplit("_", 2)
-            result_event_id = f"{result_event_id_parts[0]}.{result_event_id_parts[1]}_{result_event_id_parts[2]}"
-            fetched_event = utils.get_event_by_id(result_event_id)
+            raw_path = result["image_path"]
+            result["boat_id"] = raw_path.split("_", 1)[0]
+            
+            try:
+                parts = raw_path.split("_", 1)[1].rsplit(".", 1)[0]
+                result_event_id = parts 
+                
+                fetched_event = utils.get_event_by_id(result_event_id)
+                
+                if fetched_event:
+                    result["image_url"] = fetched_event["eventDetails"].get("imageUrl")
+                    result["coords"] = [fetched_event["start"]["point"]["lat"], fetched_event["start"]["point"]["lon"]]
+                    result["time"] = fetched_event["start"]["time"]
+                else:
+                    result["image_url"] = None 
+                    result["coords"] = [0, 0]
+                    result["time"] = "Unknown"
+                    app.logger.warning(f"Metadata lookup failed for ID: {result_event_id}")
+                    
+            except Exception as e:
+                app.logger.error(f"Error parsing path {raw_path}: {e}")
+                continue
 
-            if fetched_event:
-                result["image_url"] = fetched_event["eventDetails"]["imageUrl"] if fetched_event else None
-                result["boat_id"] = result["image_path"].split("_", 1)[0]
-                result["coords"] = [fetched_event["start"]["point"]["lat"], fetched_event["start"]["point"]["lon"]]
-                result["time"] = fetched_event["start"]["time"]
-                top_k_results_with_image_url.append(result)
+            top_k_results_with_image_url.append(result)
 
         return jsonify({
             "event": event,
