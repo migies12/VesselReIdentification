@@ -28,6 +28,7 @@ model:
 train:
   epochs: 40
   lr: 0.000117          # mean of 3 best known models (9.4e-5, 1.265e-4, 1.294e-4)
+  margin: 0.362         # fallback used by training.py — matches train.triplet.margin
   weight_decay: 0.00001
   loss: combined        # confirmed best across all sweeps
   triplet_weight: 1.67  # mean of 3 best known models (1.355, 1.678, 1.964)
