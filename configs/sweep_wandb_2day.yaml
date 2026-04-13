@@ -1,0 +1,35 @@
+method: grid
+metric:
+  name: aggregate_score
+  goal: maximize
+
+# 2-day augmentation sweep — 8 trials at ~5 hrs each (40 hrs).
+# Exhaustive grid over all combinations of the 3 augmentations whose value
+# is still uncertain: direction normalization (rotate), cropping, and
+# background normalization (normalize).
+#
+# All continuous hyperparameters are fixed at the mean of the 3 best known
+# models so the only thing varying between trials is the augmentation config:
+#   lr=1.17e-4, triplet_margin=0.362, triplet_weight=1.67,
+#   arcface_margin=0.314, arcface_weight=0.196
+#
+# All other structural choices remain fixed (confirmed by prior sweeps):
+#   loss=combined, arcface_scale=15, p=8, k=8, batches_per_epoch=1000
+#
+# The 8 combinations:
+#   rotate=F crop=F normalize=F  (baseline — no augmentation)
+#   rotate=F crop=F normalize=T
+#   rotate=F crop=T normalize=F
+#   rotate=F crop=T normalize=T
+#   rotate=T crop=F normalize=F
+#   rotate=T crop=F normalize=T
+#   rotate=T crop=T normalize=F
+#   rotate=T crop=T normalize=T  (fully augmented)
+
+parameters:
+  rotate:
+    values: [false, true]
+  crop:
+    values: [false, true]
+  normalize:
+    values: [false, true]
