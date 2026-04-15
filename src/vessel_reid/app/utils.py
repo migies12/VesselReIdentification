@@ -142,10 +142,15 @@ def process_event_helper(record):
         return None
     
 def format_event_helper(record):
+    if not record:
+        return None
+    
     details = record.get("eventDetails", {})
-    vessel_info = record.get("vessels", {}).get("vessel0", {})
     start = record.get("start", {})
     point = start.get("point", {})
+
+    vessels_wrapper = record.get("vessels", {})
+    vessel_info = vessels_wrapper.get("vessel0") or record.get("vessel") or {}
 
     return {
         "event_id": record["eventId"],

@@ -11,6 +11,7 @@ flask run --port 5001
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import os
+import re
 import torch
 
 from ..paths import FAISS_INDEX_PATH, FAISS_METADATA_PATH, RAW_IMAGES_DIR
@@ -159,3 +160,27 @@ def infer(event_id):
     except Exception as e:
         app.logger.error(f"Inference failed for event {event_id}: {str(e)}")
         return jsonify({"error": f"Inference failed: {str(e)}"}), 500
+    
+@app.route("/api/events/parse-url", methods=["POST"])
+def get_event_from_url():
+    data = request.json
+    url = data.get("url", "")
+
+    match = re.search(r'event_id/([^/?]+)', url)
+    if not match:
+        return jsonify({
+            "error": "Could not find a valid Event ID in URL"
+        })
+    
+    event_id = match.group(1)
+    event = utils.get_event_by_id(event_id)
+    if not event:
+        return jsonify({
+            "error": "Event found in URL but error fetching event"
+        })
+    event = utils.format_event_helper(event)
+    
+    global _events_cache
+    _events_cache[event["event_id"]] = event
+    
+    return jsonify(event), 200

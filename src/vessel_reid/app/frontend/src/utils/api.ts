@@ -31,3 +31,13 @@ export async function fetchDemoEvents(): Promise<VesselEvent[]> {
   if (!res.ok) throw new Error(`Failed to fetch demo events: ${res.statusText}`);
   return res.json();
 }
+
+export async function getEventByUrl(url: string): Promise<VesselEvent> {
+  const response = await fetch("/api/events/parse-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({url}),
+  });
+  if (!response.ok) throw new Error("Failed to fetch event from URL");
+  return response.json();
+}

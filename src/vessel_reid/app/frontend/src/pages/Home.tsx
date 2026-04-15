@@ -13,7 +13,7 @@ export default function Home() {
       <main className="main-panel menu-container">
         <button 
           className="nav-controls button btn-reid btn-large" 
-          onClick={() => navigate("/demo")}
+          onClick={() => navigate("/event")}
         >
           Dark Vessel Identification
         </button>
