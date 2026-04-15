@@ -67,12 +67,16 @@ def get_demo_events():
     global _events_cache
     event_ids = db.get_demo_events()
     events = []
+    
     for eid in event_ids:
         full_event = utils.get_event_by_id(eid)
-        normalized = utils.format_event_helper(full_event)
         
-        _events_cache[eid] = normalized
-        events.append(normalized)
+        if full_event is not None:
+            normalized = utils.format_event_helper(full_event)
+            _events_cache[eid] = normalized
+            events.append(normalized)
+        else:
+            app.logger.warning(f"Demo event ID {eid} not found in database.")
         
     return jsonify(events), 200
 
