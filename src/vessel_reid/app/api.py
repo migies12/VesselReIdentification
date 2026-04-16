@@ -40,23 +40,23 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = utils.load_model(cfg, device, os.path.join(os.path.dirname(__file__), "model.pt"))
 
 # In-memory event cache
-_events_cache = {}
+_recent_events_cache = {}
 
 @app.route("/api/events", methods=["GET"])
 def get_events():
     """Fetch recent Sentinel-2 vessel detection events from the Skylight API."""
-    global _events_cache
+    global _recent_events_cache
     try:
         force_refresh = request.args.get("refresh", "").lower() == "true"
 
-        if _events_cache and not force_refresh:
-            return jsonify(list(_events_cache.values())), 200
+        if _recent_events_cache and not force_refresh:
+            return jsonify(list(_recent_events_cache.values())), 200
 
         events = utils.fetch_skylight_events(days=10)
 
-        _events_cache = {}
+        _recent_events_cache = {}
         for event in events:
-            _events_cache[event["event_id"]] = event
+            _recent_events_cache[event["event_id"]] = event
 
         return jsonify(events), 200
 
@@ -65,7 +65,7 @@ def get_events():
     
 @app.route("/api/events/demo", methods=["GET"])
 def get_demo_events():
-    global _events_cache
+    global _recent_events_cache
     event_ids = db.get_demo_events()
     events = []
     
@@ -74,7 +74,7 @@ def get_demo_events():
         
         if full_event is not None:
             normalized = utils.format_event_helper(full_event)
-            _events_cache[eid] = normalized
+            _recent_events_cache[eid] = normalized
             events.append(normalized)
         else:
             app.logger.warning(f"Demo event ID {eid} not found in database.")
@@ -110,11 +110,13 @@ def gallery_image(image_path):
 @app.route("/api/events/<event_id>/infer", methods=["POST"])
 def infer(event_id):
     """Download the image for a cached event and run inference on it."""
-    if event_id not in _events_cache:
-        return jsonify({"error": "Event not found. Fetch /events first."}), 404
+    if event_id not in _recent_events_cache:
+        event = utils.get_event_by_id(event_id)
+        event = utils.format_event_helper(event)
+    else:
+        event = _recent_events_cache[event_id]
     
     try:
-        event = _events_cache[event_id]
         img_data, img_b64 = utils.download_image(event["image_url"])
 
         heading = event.get("heading")
@@ -179,8 +181,5 @@ def get_event_from_url():
             "error": "Event found in URL but error fetching event"
         })
     event = utils.format_event_helper(event)
-    
-    global _events_cache
-    _events_cache[event["event_id"]] = event
     
     return jsonify(event), 200
