@@ -1,0 +1,64 @@
+seed: 1337
+
+data:
+  image_size: 224
+  num_workers: 8
+  batch_size: 128
+  use_length: true
+  compute_length_stats: true
+  length_mean: 221.2029
+  length_std: 44.8894
+  rotate: false       # confirmed off across all top runs
+  crop: true
+  normalize: true
+  augment: true
+  pk_sampler:
+    enabled: true
+    p: 8              # matches all 3 best-known models
+    k: 8
+    batches_per_epoch: 1000   # full training budget (~5 hrs/run)
+
+model:
+  backbone: resnet50
+  embedding_dim: 512
+  use_length: true
+  length_embed_dim: 32
+  pretrained: true
+
+train:
+  epochs: 40
+  lr: 0.000117          # mean of 3 best known models (9.4e-5, 1.265e-4, 1.294e-4)
+  margin: 0.362         # fallback used by training.py — matches train.triplet.margin
+  weight_decay: 0.00001
+  loss: combined        # confirmed best across all sweeps
+  triplet_weight: 1.67  # mean of 3 best known models (1.355, 1.678, 1.964)
+  triplet:
+    distance: cosine
+    margin: 0.362       # mean of 3 best known models (0.261, 0.361, 0.463)
+    softplus: true
+  arcface_margin: 0.314 # mean of 3 best known models (0.307, 0.316, 0.318)
+  arcface_scale: 15     # confirmed best (vs 30) across all sweeps
+  arcface_weight: 0.196 # mean of 3 best known models (0.103, 0.220, 0.264)
+  log_every: 50
+
+gallery:
+  image_size: 224
+  use_length: true
+  length_mean: 221.2029
+  length_std: 44.8894
+
+faiss:
+  normalize: true
+
+query:
+  image_size: 224
+  use_length: true
+  length_mean: 221.2029
+  length_std: 44.8894
+
+eval:
+  threshold: 0.7
+  max_fpr: 0.01
+
+sweep:
+  sweep_epochs: 40    # full epochs — each trial is a fully trained model

@@ -1,0 +1,36 @@
+method: bayes
+metric:
+  name: aggregate_score
+  goal: maximize
+
+parameters:
+  lr:
+    distribution: log_uniform_values
+    min: 0.00001
+    max: 0.0003
+  triplet_margin:
+    distribution: uniform
+    min: 0.1
+    max: 0.5
+  arcface_margin:
+    distribution: uniform
+    min: 0.3
+    max: 0.7
+  arcface_scale:
+    values: [15, 30, 64]
+  loss:
+    values: ["triplet", "combined"]
+  p:
+    values: [4, 8, 16]
+  k:
+    values: [4, 8]
+  crop:
+    values: [true, false]
+  crop_fraction:
+    distribution: uniform
+    min: 0.1
+    max: 0.6
+  normalize:
+    values: [true, false]
+  use_length:
+    values: [true, false]

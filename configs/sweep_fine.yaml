@@ -1,0 +1,68 @@
+seed: 1337
+
+data:
+  image_size: 224
+  num_workers: 4
+  batch_size: 64
+  use_length: true
+  compute_length_stats: true
+  length_mean: 221.2029
+  length_std: 44.8894
+  rotate: false
+  crop: false        # fixed off — cropping consistently hurt coarse sweep performance
+  normalize: false   # fixed off — normalisation consistently hurt coarse sweep performance
+  augment: true
+  crop_fraction: 0.6
+  pk_sampler:
+    enabled: true
+    p: 16            # fixed at 16 — more vessels per batch = harder negatives, better signal
+    k: 8             # fixed at 8 — more images per vessel = better hard positive mining
+    batches_per_epoch: 50
+
+model:
+  backbone: resnet50
+  embedding_dim: 512
+  use_length: true   # fixed on — consistently helped in coarse sweep
+  length_embed_dim: 32
+  pretrained: true
+
+train:
+  epochs: 40        # overridden by sweep.sweep_epochs during sweep
+  lr: 0.0001
+  weight_decay: 0.00001
+  margin: 0.3
+  loss: combined
+  triplet_weight: 2.0
+  triplet:
+    distance: cosine
+    margin: 0.2
+    softplus: true
+  arcface_margin: 0.5
+  arcface_scale: 30.0
+  arcface_weight: 0.5
+  log_every: 50
+
+gallery:
+  image_size: 224
+  use_length: true
+  length_mean: 221.2029
+  length_std: 44.8894
+
+faiss:
+  normalize: true
+
+query:
+  image_size: 224
+  use_length: true
+  length_mean: 221.2029
+  length_std: 44.8894
+
+eval:
+  threshold: 0.7
+  max_fpr: 0.01
+
+sweep:
+  # fine phase: 35 epochs per trial, 25 trials max
+  # fixed: crop=false, normalize=false, p=16, k=8, use_length=true
+  # varying: lr (5e-5 to 2e-4), loss type, triplet margin, arcface margin, arcface scale (15/30)
+  sweep_epochs: 35

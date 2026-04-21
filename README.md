@@ -11,7 +11,7 @@ pip install -e .
 ```
 
 ## Data layout
-See `dataset/README.md` for the expected CSV format and folder structure.
+See `src/vessel_reid/model/README.md` for the full module structure, config options, and CLI reference.
 
 ## Typical workflow
 1) Prepare ID-disjoint splits (train/val/gallery/query).
@@ -21,75 +21,34 @@ See `dataset/README.md` for the expected CSV format and folder structure.
 
 Generate splits:
 ```bash
-python -m vessel_reid.cli.split_ids --csv data/all_labels.csv --out-dir data
+python -m vessel_reid.model.dataset.split_ids --csv data/metadata/raw.csv --out-dir data/
 ```
 Or generate splits directly from image filenames:
 ```bash
-python -m vessel_reid.cli.split_ids --image-dir data/images --out-dir data
+python -m vessel_reid.model.dataset.split_ids --image-dir data/images/filtered --out-dir data/
 ```
+
 ## Commands
 Train:
 ```bash
-python -m vessel_reid.cli.train --config configs/train.yaml
+python -m vessel_reid.model.training.training --config configs/train.yaml
 ```
 
 Build gallery:
 ```bash
-python -m vessel_reid.cli.build_gallery --config configs/gallery.yaml
+python -m vessel_reid.model.inference.build_gallery --config configs/gallery.yaml
 ```
 
 Query:
 ```bash
-python -m vessel_reid.cli.infer --config configs/inference.yaml --image path/to/query.jpg --length-m 42.7
+python -m vessel_reid.model.inference.infer --config configs/inference.yaml --image path/to/query.jpg --length-m 42.7
 ```
 
 Visualize training metrics:
 ```bash
-python -m vessel_reid.cli.visualize --stats-csv outputs/train_stats.csv --output-dir outputs
+python -m vessel_reid.model.training.training_curves --stats-csv model/train_stats.csv --output-dir statistics/
 ```
 ## Notes
 - Assumes each image contains one boat (no detection stage).
 - For evaluation, keep boat IDs disjoint across train/val/test.
 - In deployment, it is expected to keep multiple images per boat in the gallery.
-
----
-
-## Changelog - Branch: `mica`
-
-### `src/vessel_reid/cli/train.py`
-- **Change**: Added mixed precision training with `torch.cuda.amp`
-- **Why**: Gets 2-3x speedup on A100 GPU by using half-precision where possible
-
-- **Change**: Added `pin_memory=True` and `persistent_workers=True` to DataLoader
-- **Why**: Makes data loading faster by keeping workers alive and pinning memory
-
-### `configs/train.yaml`
-- **Change**: Increased `batch_size` from 32 to 128
-- **Why**: A100 has 40GB of VRAM, was barely using any of it with batch size 32
-
-- **Change**: Increased `num_workers` from 4 to 8
-- **Why**: Load data faster with more parallel workers
-
-### `src/vessel_reid/utils/seed.py`
-- **Change**: Set `cudnn.benchmark=True` and `cudnn.deterministic=False`
-- **Why**: Lets cuDNN find the fastest algorithms for this hardware
-
-### `src/vessel_reid/api/api_helper.py`
-- **Change**: Increased API limit from 100 to 1000 events
-- **Why**: Grab way more vessel detections in one API call
-
-- **Change**: Added `offset` parameter for pagination support
-- **Why**: Allow fetching results beyond the first 1000 events
-
-### `src/vessel_reid/api/populate_data.py`
-- **Change**: Increased time window from 1 day to 30 days
-- **Why**: Need more historical data to find multiple images of each boat
-
-- **Change**: Added vessel grouping and filtering (minimum 3 images per vessel)
-- **Why**: Triplet loss needs multiple images of the same vessel to learn properly
-
-- **Change**: Added pagination loop to fetch all available results
-- **Why**: Don't miss any data if there are more than 1000 events in the time window
-
-- **Change**: Save fetched event IDs to `dataset/fetched_event_ids.txt`
-- **Why**: Track which events were fetched for future reproducibility

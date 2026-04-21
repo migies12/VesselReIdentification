@@ -41,6 +41,7 @@ DATASET_DIR = REPO_ROOT / "data"
 TRAIN_CSV   = DATASET_DIR / "train.csv"
 VAL_CSV     = DATASET_DIR / "val.csv"
 GALLERY_CSV = DATASET_DIR / "gallery.csv"
+QUERY_CSV   = DATASET_DIR / "query.csv"
 
 # ---------------------------------------------------------------------------
 # model outputs — trained model, FAISS gallery, training stats

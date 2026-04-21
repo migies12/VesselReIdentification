@@ -1,0 +1,35 @@
+method: bayes
+metric:
+  name: aggregate_score
+  goal: maximize
+
+# Tight search around the best-performing runs from the fine sweep.
+# Combined loss and no rotation were consistent across all top-5 runs.
+# LR, margins, and weights are narrowed to the region those runs occupied.
+parameters:
+  loss:
+    values: ["combined"]
+  rotate:
+    values: [false]
+  arcface_scale:
+    values: [15]
+  lr:
+    distribution: log_uniform_values
+    min: 0.00008
+    max: 0.00016
+  arcface_margin:
+    distribution: uniform
+    min: 0.28
+    max: 0.38
+  arcface_weight:
+    distribution: uniform
+    min: 0.08
+    max: 0.32
+  triplet_margin:
+    distribution: uniform
+    min: 0.30
+    max: 0.52
+  triplet_weight:
+    distribution: uniform
+    min: 1.2
+    max: 2.3
