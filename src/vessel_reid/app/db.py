@@ -18,6 +18,12 @@ def init_cloudy_table():
             )       
         """)
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS demo_events (
+                event_id TEXT PRIMARY KEY         
+            )           
+        """)
+
 def get_cached_cloudy_status(event_id):
     """
     True if image is stored as cloudy
@@ -40,3 +46,26 @@ def cache_cloudy_status(event_id, is_cloudy):
             "INSERT OR REPLACE INTO cloudy_cache (event_id, is_cloudy) VALUES (?, ?)",
             (event_id, 1 if is_cloudy else 0)
         )
+
+def add_demo_event(event_id):
+    """
+    Add a new demo event to the demo events table
+    """
+    with get_db_connection() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO demo_events (event_id) VALUES (?)",
+            (event_id,)
+        )
+
+def remove_demo_event(event_id):
+    with get_db_connection() as conn:
+        conn.execute("DELETE FROM demo_events WHERE event_id = ?", (event_id,))
+
+def get_demo_events():
+    """
+    Get the list of event IDs to use for demo view
+    """
+    with get_db_connection() as conn:
+        cursor = conn.execute("SELECT * FROM demo_events")
+        rows = cursor.fetchall()
+        return [row[0] for row in rows]
