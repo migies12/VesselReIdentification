@@ -1,0 +1,62 @@
+data:
+  augment: true
+  batch_size: 128
+  compute_length_stats: true
+  crop: false
+  csv_path: /mnt/disks/sdb/VesselReIdentification/data/train.csv
+  image_root: /mnt/disks/sdb/VesselReIdentification/data/images/raw
+  image_size: 224
+  length_mean: 221.2029
+  length_std: 44.8894
+  normalize: false
+  num_workers: 8
+  pk_sampler:
+    batches_per_epoch: 1000
+    enabled: true
+    k: 8
+    p: 8
+  rotate: true
+  use_length: true
+eval:
+  max_fpr: 0.01
+  threshold: 0.7
+faiss:
+  normalize: true
+gallery:
+  csv_path: /mnt/disks/sdb/VesselReIdentification/data/gallery.csv
+  image_root: /mnt/disks/sdb/VesselReIdentification/data/images/raw
+  image_size: 224
+  length_mean: 221.2029
+  length_std: 44.8894
+  use_length: true
+model:
+  backbone: resnet50
+  embedding_dim: 512
+  length_embed_dim: 32
+  pretrained: true
+  use_length: true
+query:
+  csv_path: /mnt/disks/sdb/VesselReIdentification/data/query.csv
+  image_root: /mnt/disks/sdb/VesselReIdentification/data/images/raw
+  image_size: 224
+  length_mean: 221.2029
+  length_std: 44.8894
+  use_length: true
+seed: 1337
+sweep:
+  sweep_epochs: 40
+train:
+  arcface_margin: 0.314
+  arcface_scale: 15
+  arcface_weight: 0.196
+  epochs: 40
+  log_every: 50
+  loss: combined
+  lr: 0.000117
+  margin: 0.362
+  triplet:
+    distance: cosine
+    margin: 0.362
+    softplus: true
+  triplet_weight: 1.67
+  weight_decay: 1.0e-05
